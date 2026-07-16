@@ -49,4 +49,10 @@ COPY --from=build /app/package.json ./package.json
 COPY src/content ./src/content
 
 EXPOSE 3000
+
+# node:22-slim has neither curl nor wget, so the check shells out to Node's
+# own http client instead of a missing binary.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+	CMD node -e "require('http').get('http://localhost:3000/healthz', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+
 CMD ["node", "build/index.js"]
