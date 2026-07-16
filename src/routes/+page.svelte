@@ -8,6 +8,7 @@
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { reveal } from '$lib/actions/reveal';
 	import { socialLinks, site } from '$lib/config';
+	import Seo from '$lib/components/Seo.svelte';
 
 	const icons = { github: GithubIcon, linkedin: LinkedinIcon, mail: MailIcon };
 	import type { PageData } from './$types';
@@ -15,9 +16,7 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-<svelte:head>
-	<title>{site.name}</title>
-</svelte:head>
+<Seo title={site.name} description={site.description} path="/" />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<section class="flex flex-col items-center text-center">

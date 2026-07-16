@@ -54,7 +54,7 @@ export function getAllDevlogEntries(): DevlogMeta[] {
 			const { slug, meta, body } = readEntryFile(filename);
 			return toMeta(slug, meta, body);
 		})
-		.sort((a, b) => (a.date < b.date ? 1 : -1));
+		.sort((a, b) => (a.date > b.date ? 1 : -1));
 }
 
 export function getDevlogEntry(slug: string): DevlogEntry | null {

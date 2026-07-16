@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { attachCopyButtons } from '$lib/actions/copy-code';
 	import { mountEmbeds } from '$lib/actions/mount-embeds';
+	import Seo from '$lib/components/Seo.svelte';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import type { PageData } from './$types';
 
@@ -31,9 +32,12 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{data.entry.title} — RazerGhost</title>
-</svelte:head>
+<Seo
+	title="{data.entry.title} — RazerGhost"
+	description={data.entry.excerpt}
+	path="/devlog/{data.entry.slug}"
+	image={data.entry.cover}
+/>
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<a href="/devlog" class="link flex items-center gap-1 text-sm text-primary hover:opacity-85">

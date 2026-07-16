@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DiscordPresence from '$lib/components/DiscordPresence.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 
 	const updated = 'July 16, 2026';
@@ -10,9 +11,7 @@
 	];
 </script>
 
-<svelte:head>
-	<title>Status — RazerGhost</title>
-</svelte:head>
+<Seo title="Status — RazerGhost" description="What I'm up to right now." path="/status" />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Status</h1>

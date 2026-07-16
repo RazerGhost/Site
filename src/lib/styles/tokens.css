@@ -145,6 +145,46 @@
 	--dur-glow-pulse: 5s;
 }
 
+/* ── Light mode ──────────────────────────────────────────────────────
+   Overrides the neutral surface/text tokens only — the accent (cyan),
+   spacing, radii, and motion tokens stay identical across themes.
+   Applied when the OS prefers light AND there's no explicit override,
+   or when the user has explicitly picked "light" via the theme toggle
+   (which stamps data-theme on <html> and persists to localStorage). */
+:root[data-theme='light'] {
+	color-scheme: light;
+
+	--bg: #ffffff;
+	--surface: #f6f6f6;
+	--surface-2: #ececec;
+	--border: #e2e2e2;
+	--white: #0a0a0a;
+	--gray: #4b4d52;
+	--dim: #86888c;
+	--black: #ffffff;
+
+	--primary-glow: rgba(34, 211, 238, 0.12);
+	--primary-glow-border: rgba(34, 211, 238, 0.35);
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']):not([data-theme='light']) {
+		color-scheme: light;
+
+		--bg: #ffffff;
+		--surface: #f6f6f6;
+		--surface-2: #ececec;
+		--border: #e2e2e2;
+		--white: #0a0a0a;
+		--gray: #4b4d52;
+		--dim: #86888c;
+		--black: #ffffff;
+
+		--primary-glow: rgba(34, 211, 238, 0.12);
+		--primary-glow-border: rgba(34, 211, 238, 0.35);
+	}
+}
+
 /* ── Base reset (same conventions as RG Digital's base.css) ──
    Wrapped in Tailwind's `base` layer: unlayered CSS always wins over
    layered CSS regardless of specificity, so leaving this reset unlayered

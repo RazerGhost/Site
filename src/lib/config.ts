@@ -31,7 +31,8 @@ export const socialLinks = [
 ];
 
 export const navLinks = [
+  { label: "Projects", href: "/projects" },
   { label: "Devlog", href: "/devlog" },
   { label: "Status", href: "/status" },
-  { label: "Uses", href: "/uses" },
+  { label: "Gear", href: "/gear" },
 ];

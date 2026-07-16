@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { navLinks } from '$lib/config';
 	import Logo from '$lib/components/Logo.svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 </script>
 
 <header
@@ -12,19 +13,22 @@
 			<Logo variant="outline" size={22} />
 			<span class="text-sm font-bold tracking-tight text-white">RazerGhost</span>
 		</a>
-		<ul class="flex items-center gap-5">
-			{#each navLinks as link}
-				<li>
-					<a
-						href={link.href}
-						class="text-sm transition-colors {page.url.pathname.startsWith(link.href)
-							? 'text-primary'
-							: 'text-gray hover:text-primary'}"
-					>
-						{link.label}
-					</a>
-				</li>
-			{/each}
-		</ul>
+		<div class="flex items-center gap-4">
+			<ul class="flex items-center gap-5">
+				{#each navLinks as link}
+					<li>
+						<a
+							href={link.href}
+							class="text-sm transition-colors {page.url.pathname.startsWith(link.href)
+								? 'text-primary'
+								: 'text-gray hover:text-primary'}"
+						>
+							{link.label}
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<ThemeToggle />
+		</div>
 	</nav>
 </header>

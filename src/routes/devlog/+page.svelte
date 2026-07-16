@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DevlogCard from '$lib/components/DevlogCard.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import { reveal } from '$lib/actions/reveal';
 	import Rss from '@lucide/svelte/icons/rss';
 	import type { PageData } from './$types';
@@ -7,12 +8,18 @@
 	let { data }: { data: PageData } = $props();
 
 	let selectedTag = $state<string | null>(null);
+	let query = $state('');
 
 	const tags = $derived([...new Set(data.entries.flatMap((e) => e.tags))].sort());
 
 	const filtered = $derived.by(() => {
 		const tag = selectedTag;
-		return tag ? data.entries.filter((e) => e.tags.includes(tag)) : data.entries;
+		const q = query.trim().toLowerCase();
+		return data.entries.filter((e) => {
+			const matchesTag = !tag || e.tags.includes(tag);
+			const matchesQuery = !q || e.title.toLowerCase().includes(q) || e.excerpt.toLowerCase().includes(q);
+			return matchesTag && matchesQuery;
+		});
 	});
 
 	function toggleTag(tag: string) {
@@ -20,9 +27,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Devlog — RazerGhost</title>
-</svelte:head>
+<Seo title="Devlog — RazerGhost" description="Notes on whatever I'm building at the moment." path="/devlog" />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<div class="flex items-baseline justify-between" data-hero-reveal="0">
@@ -35,6 +40,13 @@
 		</a>
 	</div>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Notes on whatever I'm building at the moment.</p>
+
+	<input
+		type="search"
+		bind:value={query}
+		placeholder="Search posts…"
+		class="mt-6 w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
+	/>
 
 	{#if tags.length}
 		<ul class="mt-6 flex flex-wrap gap-2">
@@ -67,7 +79,7 @@
 		{#each filtered as entry (entry.slug)}
 			<DevlogCard {entry} />
 		{:else}
-			<p class="text-sm text-dim">No entries match that tag.</p>
+			<p class="text-sm text-dim">No entries match your search.</p>
 		{/each}
 	</div>
 </main>
