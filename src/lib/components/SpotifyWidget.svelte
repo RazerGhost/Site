@@ -158,7 +158,7 @@
 	<div class="fixed bottom-6 left-6 z-10 flex flex-col items-start gap-2" data-hero-reveal="0">
 		{#if expanded}
 			<div
-				class="card w-80 rounded-lg border border-border bg-surface p-3 shadow-[var(--shadow-card-hover)]"
+				class="card w-80 rounded-lg border border-border bg-surface/80 p-3 shadow-[var(--shadow-card-hover)] backdrop-blur-md"
 			>
 				<div class="flex items-center gap-3">
 					{#if data.albumArt}
@@ -241,7 +241,7 @@
 			<button
 				type="button"
 				aria-label={`Now playing: ${data.track} by ${data.artist}. Click to expand.`}
-				class="card flex items-center gap-2 rounded-full border border-border bg-surface py-1.5 pr-4 pl-1.5 shadow-[var(--shadow-card-hover)] transition-colors hover:border-primary"
+				class="card flex items-center gap-2 rounded-full border border-border bg-surface/80 py-1.5 pr-4 pl-1.5 shadow-[var(--shadow-card-hover)] backdrop-blur-md transition-colors hover:border-primary"
 				onclick={() => (expanded = true)}
 			>
 				<span class="relative h-8 w-8 shrink-0">

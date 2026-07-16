@@ -9,7 +9,7 @@ export const site = {
   // return data, this Discord account must have joined Lanyard's Discord
   // server (discord.gg/lanyard) at least once.
   discordUserId:
-    "425729668482859008" /* TODO: replace with your real Discord user ID */,
+    "425729668482859008"
 };
 
 export const socialLinks = [

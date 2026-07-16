@@ -202,6 +202,15 @@
 	html {
 		color-scheme: dark;
 		scroll-behavior: smooth;
+		/* Belongs on html, not body: setting overflow-x alone on an element
+		   forces the UA to compute its overflow-y as 'auto' too (CSS Overflow
+		   spec), turning that element into its own scroll container. Put on
+		   body, that silently made body scroll instead of the viewport —
+		   window.scrollY then never changes, breaking anything (scroll-spy,
+		   back-to-top buttons) that listens on window. html is normally the
+		   scrolling element already, so this is a no-op there besides
+		   clipping horizontal overflow. */
+		overflow-x: hidden;
 	}
 
 	body {
@@ -210,7 +219,6 @@
 		color: var(--white);
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
-		overflow-x: hidden;
 	}
 
 	img,
