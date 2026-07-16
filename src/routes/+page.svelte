@@ -72,11 +72,11 @@
 	<section class="cta-band mt-20" use:reveal>
 		<p class="relative text-lg font-semibold text-white">Got something to build together?</p>
 		<a
-			href="https://rg-digital.dev"
+			href="https://rg-digital.dev/about"
 			target="_blank"
 			class="link relative mt-2 inline-flex items-center gap-1 text-sm text-primary hover:opacity-85"
 		>
-			Enquire now <ArrowRight size={15} aria-hidden="true" />
+			See my work at RG Digital <ArrowRight size={15} aria-hidden="true" />
 		</a>
 	</section>
 </main>
