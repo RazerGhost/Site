@@ -33,4 +33,8 @@ hydrated client-side into an actual Svelte component after the page loads:
 
 <div data-embed="Counter"></div>
 
+Embeds can also take props via `data-*` attributes on the placeholder:
+
+<div data-embed="Terminal"></div>
+
 > Mostly this exists so I have somewhere to write things down.

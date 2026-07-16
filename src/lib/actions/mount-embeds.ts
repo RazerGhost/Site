@@ -9,8 +9,12 @@ export function mountEmbeds(container: HTMLElement): () => void {
 		const Component = name ? embedRegistry[name] : undefined;
 		if (!Component) return;
 
+		// Any other data-* attributes on the placeholder (besides data-embed)
+		// are passed through as props, e.g. data-before="/a.png" -> { before: '/a.png' }.
+		const { embed: _embed, ...props } = el.dataset;
+
 		el.textContent = '';
-		mounted.push(mount(Component, { target: el }));
+		mounted.push(mount(Component, { target: el, props }));
 	});
 
 	return () => {
