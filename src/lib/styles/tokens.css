@@ -1,0 +1,344 @@
+/* ── Design tokens — ported from RG Digital, cyan accent system ──────
+   Source: Brand/design-system/tokens.css. No lime anywhere here.
+
+   ACCENT SYSTEM — two tiers, replacing RG Digital's single --green:
+
+     --color-primary  (#22D3EE)  = calm / idle. Use for anything visible
+       most of the time: buttons, borders, links, general UI chrome.
+
+     --color-action    (#00E5FF)  = something just happened. Use only for
+       active/triggered moments tied to a live event firing: flashes,
+       pop-ins, fill animations, celebratory states.
+
+   Rule of thumb: if it's on screen at rest, use --color-primary.
+   If it's reacting to an event, use --color-action.
+   ──────────────────────────────────────────────────────────────────── */
+
+:root {
+	/* ── Fonts (same family/weights/scale as RG Digital) ── */
+	--font: 'Inter', 'Inter Variable', system-ui, -apple-system, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	--fw-regular: 400;
+	--fw-medium: 500;
+	--fw-semibold: 600;
+	--fw-bold: 700;
+	--fw-extrabold: 800;
+
+	--fs-display: 42px; /* weight 800, --track-display */
+	--fs-heading: 28px; /* weight 800 */
+	--fs-subheading: 18px; /* weight 600 */
+	--fs-body: 16px; /* weight 400 */
+	--fs-body-sm: 14px;
+	--fs-label: 12px; /* weight 500, uppercase, --track-label */
+	--fs-meta: 11px;
+
+	--fs-hero: clamp(44px, 5.5vw, 72px);
+	--fs-section: clamp(36px, 3.5vw, 52px);
+
+	--lh-tight: 1.05;
+	--lh-heading: 1.2;
+	--lh-body: 1.6;
+	--lh-relaxed: 1.75;
+
+	--track-tight: -0.03em;
+	--track-display: -0.02em;
+	--track-label: 0.06em;
+	--track-loose: 0.1em;
+
+	/* ── Spacing (identical 4px-based scale) ── */
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 20px;
+	--space-6: 24px;
+	--space-8: 32px;
+	--space-10: 40px;
+	--space-12: 48px;
+	--space-14: 56px;
+	--space-16: 64px;
+
+	--pad: clamp(24px, 8.33vw, 120px);
+	--max-w: 1440px;
+	--nav-h: 72px;
+
+	/* ── Radius (identical) ── */
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-full: 9999px;
+
+	/* ── Surfaces / neutrals (same near-black system as RG Digital) ── */
+	--bg: #0a0a0a;
+	--surface: #111111;
+	--surface-2: #1e1e1e;
+	--border: #2a2a2a;
+	--white: #ffffff;
+	--gray: #a1a1a1;
+	--dim: #6b6b6b;
+	--black: #000000;
+
+	/* ── Accent — two-tier cyan (replaces single --green) ── */
+	--color-primary: #22d3ee; /* idle / static UI: buttons, borders, chrome */
+	--color-action: #00e5ff; /* active moments: flashes, fills, celebrations */
+
+	/* Glows / borders derived from primary (idle-state use, mirrors
+     RG Digital's --green-glow / --green-glow-border at same alpha) */
+	--primary-glow: rgba(34, 211, 238, 0.08);
+	--primary-glow-border: rgba(34, 211, 238, 0.25);
+
+	/* Glow derived from action, for triggered-state rings/flashes */
+	--action-glow: rgba(0, 229, 255, 0.35);
+
+	/* Semantic feedback (unchanged from source — not part of the accent system) */
+	--danger: #ff5050;
+	--danger-text: #ff6464;
+	--warn: #ffa03c;
+
+	/* Semantic aliases */
+	--text-primary: var(--white);
+	--text-secondary: var(--gray);
+	--text-muted: var(--dim);
+	--text-accent: var(--color-primary);
+
+	--surface-page: var(--bg);
+	--surface-card: var(--surface);
+	--surface-raised: var(--surface-2);
+
+	--border-default: var(--border);
+	--border-accent: var(--primary-glow-border);
+
+	--focus-ring: var(--color-primary);
+
+	/* ── Shadows (identical values — neutral, not accent-tinted at rest) ── */
+	--shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.3);
+	--shadow-nav: 0 1px 0 var(--border), 0 8px 32px rgba(0, 0, 0, 0.5);
+	--shadow-swatch: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+	/* Focus glow — now primary (idle chrome), not action */
+	--ring-accent: 0 0 0 3px var(--primary-glow);
+
+	/* Trigger flash ring — new, uses --color-action for live events */
+	--ring-action: 0 0 0 3px var(--action-glow);
+
+	/* ── Motion (identical durations/easing to RG Digital) ── */
+	--dur-fast: 0.15s;
+	--dur-base: 0.2s;
+	--dur-slow: 0.3s;
+	--dur-enter: 0.65s;
+
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+	--ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+	--blur-nav: blur(12px);
+
+	/* Page vs UI transition targets (from brand-motion guideline, not a
+     literal source token — documented as a convention: UI < 300ms,
+     page-level ~400ms). Provided here as named durations for consumers. */
+	--dur-page: 0.4s;
+
+	/* CTA-band ambient glow pulse — the one ambient-loop exception in the
+     source system. Uses --color-primary (idle chrome), since an always-on
+     ambient loop is not a "triggered" moment. */
+	--dur-glow-pulse: 5s;
+}
+
+/* ── Base reset (same conventions as RG Digital's base.css) ──
+   Wrapped in Tailwind's `base` layer: unlayered CSS always wins over
+   layered CSS regardless of specificity, so leaving this reset unlayered
+   would silently override every Tailwind spacing utility (mx-auto, px-*,
+   py-*, gap-*, etc.) applied on top of it. */
+@layer base {
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	html {
+		color-scheme: dark;
+		scroll-behavior: smooth;
+	}
+
+	body {
+		font-family: var(--font);
+		background: var(--bg);
+		color: var(--white);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		overflow-x: hidden;
+	}
+
+	img,
+	video {
+		max-width: 100%;
+		display: block;
+	}
+
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+	/* Idle link accent — primary, not action */
+	a.link {
+		color: var(--color-primary);
+	}
+	a.link:hover {
+		opacity: 0.85;
+	}
+
+	ul,
+	ol {
+		list-style: none;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--focus-ring);
+		outline-offset: 3px;
+		border-radius: var(--radius-sm);
+	}
+
+	/* Selection uses primary (idle chrome convention), not action */
+	::selection {
+		background: var(--color-primary);
+		color: var(--black);
+	}
+}
+
+.text-primary-accent {
+	color: var(--color-primary);
+}
+.text-action-accent {
+	color: var(--color-action);
+}
+.text-gray {
+	color: var(--gray);
+}
+.text-dim {
+	color: var(--dim);
+}
+
+/* ── Component interaction states ──────────────────────────── */
+
+/* Button — idle chrome, lift + opacity like source (no color shift) */
+.btn:hover {
+	opacity: 0.88;
+	transform: translateY(-1px);
+}
+.btn:active {
+	transform: translateY(0);
+}
+
+/* Card — hover uses primary (idle hover, not a "live event") */
+.card {
+	transition:
+		border-color var(--dur-base),
+		box-shadow var(--dur-base);
+}
+.card--interactive:hover {
+	border-color: var(--primary-glow-border);
+	box-shadow:
+		0 0 0 1px var(--primary-glow),
+		var(--shadow-card-hover);
+}
+
+/* Chip — subtle, primary on hover */
+.chip {
+	transition:
+		color var(--dur-fast),
+		border-color var(--dur-fast);
+}
+.chip:hover {
+	color: var(--color-primary);
+	border-color: var(--color-primary);
+}
+
+/* Inputs — primary focus ring (idle interaction, not a triggered event) */
+.input:focus,
+.textarea:focus {
+	border-color: rgba(34, 211, 238, 0.5);
+	box-shadow: var(--ring-accent);
+	outline: none;
+}
+.input::placeholder,
+.textarea::placeholder {
+	color: var(--dim);
+}
+
+/* Service card arrow nudge on hover (idle affordance → primary) */
+.service-card:hover .service-card__arrow {
+	transform: translate(3px, -3px);
+}
+
+/* FAQ accordion — primary on hover/open (idle affordance) */
+.faq__q::-webkit-details-marker {
+	display: none;
+}
+.faq__q:hover {
+	color: var(--color-primary);
+}
+.faq[open] .faq__icon {
+	transform: rotate(45deg);
+}
+
+/* Triggered / live-event states — use --color-action, never --color-primary */
+.flash-in {
+	animation: flash-in var(--dur-enter) var(--ease-out);
+}
+@keyframes flash-in {
+	0% {
+		box-shadow: var(--ring-action);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(0, 229, 255, 0);
+	}
+}
+.pill-fired {
+	border-color: var(--color-action);
+	box-shadow: var(--ring-action);
+}
+
+/* CTA-band ambient glow — ported from CtaBand.jsx's radial-gradient overlay.
+   Idle/always-on, so it uses --color-primary, not --color-action. */
+.cta-band {
+	position: relative;
+	overflow: hidden;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	padding: 64px 40px;
+	text-align: center;
+}
+.cta-band::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: radial-gradient(
+		ellipse 60% 80% at 50% -20%,
+		var(--primary-glow) 0%,
+		transparent 70%
+	);
+	animation: cta-glow-pulse var(--dur-glow-pulse) var(--ease-inout) infinite;
+}
+@keyframes cta-glow-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.cta-band::before {
+		animation: none;
+	}
+	.flash-in {
+		animation: none;
+	}
+}

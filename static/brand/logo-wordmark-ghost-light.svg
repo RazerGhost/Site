@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 50" role="img">
+  <title>RazerGhost — wordmark with ghost (light field)</title>
+  <text x="2" y="40" font-family="Inter, &#39;Inter Variable&#39;, system-ui, sans-serif" font-size="40" font-weight="800" fill="#0a0a0a" letter-spacing="-0.8" textLength="184.8" lengthAdjust="spacing">RazerGhost</text>
+  <g transform="translate(190 24) scale(0.17)">
+    <path d="M20 81 V42 A30 30 0 0 1 80 42 V81 L70 89 L60 81 L50 89 L40 81 L30 89 Z" fill="#0a0a0a"></path>
+    <circle cx="39" cy="43" r="5.5" fill="#22d3ee"></circle>
+    <circle cx="61" cy="43" r="5.5" fill="#22d3ee"></circle>
+  </g>
+</svg>

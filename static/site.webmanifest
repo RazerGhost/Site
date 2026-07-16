@@ -1,0 +1,10 @@
+{
+	"name": "RazerGhost",
+	"short_name": "RazerGhost",
+	"icons": [
+		{ "src": "/brand/logo-icon.svg", "sizes": "any", "type": "image/svg+xml" }
+	],
+	"theme_color": "#0a0a0a",
+	"background_color": "#0a0a0a",
+	"display": "standalone"
+}

@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import 'tailwindcss';
+@import './lib/styles/tokens.css';
+
+/* Map the brand tokens (src/lib/styles/tokens.css) into Tailwind's theme so
+   utilities like bg-surface, text-primary, border-border, rounded-lg resolve
+   to the same values used by the hand-written component classes.
+
+   Note: a few Tailwind theme variable names collide with tokens.css's own
+   custom property names (--color-primary, --color-action, --radius-*,
+   --font-mono). Those are given literal values here instead of var()
+   indirection to avoid a self-referential custom property; they still
+   mirror the values in tokens.css exactly. */
+@theme {
+	--font-sans: var(--font);
+	--font-mono:
+		ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	--color-bg: var(--bg);
+	--color-surface: var(--surface);
+	--color-surface-2: var(--surface-2);
+	--color-border: var(--border);
+	--color-white: var(--white);
+	--color-gray: var(--gray);
+	--color-dim: var(--dim);
+
+	--color-primary: #22d3ee;
+	--color-action: #00e5ff;
+	--color-danger: var(--danger);
+	--color-warn: var(--warn);
+
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-full: 9999px;
+
+	--spacing-1: var(--space-1);
+	--spacing-2: var(--space-2);
+	--spacing-3: var(--space-3);
+	--spacing-4: var(--space-4);
+	--spacing-5: var(--space-5);
+	--spacing-6: var(--space-6);
+	--spacing-8: var(--space-8);
+	--spacing-10: var(--space-10);
+	--spacing-12: var(--space-12);
+	--spacing-14: var(--space-14);
+	--spacing-16: var(--space-16);
+}
+
+/* Faint ambient glow behind the page, anchored top-center — gives the dark
+   surface some depth without turning into a "marketing page" gradient. */
+.bg-glow {
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: radial-gradient(
+		ellipse 60% 40% at 50% 0%,
+		var(--primary-glow) 0%,
+		transparent 70%
+	);
+}
+
+.text-hero {
+	font-size: var(--fs-hero);
+	font-weight: var(--fw-extrabold);
+	line-height: var(--lh-tight);
+	letter-spacing: var(--track-display);
+}
+
+/* Minimal styling for devlog post bodies rendered via {@html} — kept
+   hand-rolled rather than pulling in @tailwindcss/typography for a
+   handful of element types. */
+.devlog-content {
+	color: var(--gray);
+	line-height: var(--lh-body);
+}
+.devlog-content > * + * {
+	margin-top: var(--space-4);
+}
+.devlog-content h1,
+.devlog-content h2,
+.devlog-content h3 {
+	color: var(--white);
+	font-weight: var(--fw-bold);
+	line-height: var(--lh-heading);
+	margin-top: var(--space-8);
+}
+.devlog-content h2 {
+	font-size: var(--fs-heading);
+}
+.devlog-content h3 {
+	font-size: var(--fs-subheading);
+}
+.devlog-content a {
+	color: var(--color-primary);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.devlog-content ul,
+.devlog-content ol {
+	list-style: disc;
+	padding-left: var(--space-6);
+}
+.devlog-content ol {
+	list-style: decimal;
+}
+.devlog-content code {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	background: var(--surface-2);
+	padding: 0.15em 0.4em;
+	border-radius: var(--radius-sm);
+}
+.devlog-content pre {
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	padding: var(--space-4);
+	overflow-x: auto;
+}
+.devlog-content pre code {
+	background: none;
+	padding: 0;
+}
+.devlog-content blockquote {
+	border-left: 2px solid var(--border);
+	padding-left: var(--space-4);
+	color: var(--dim);
+}
+
+/* Copy button injected into <pre> blocks by src/lib/actions/copy-code.ts */
+.copy-code-btn {
+	position: absolute;
+	top: var(--space-2);
+	right: var(--space-2);
+	font-family: var(--font);
+	font-size: var(--fs-meta);
+	color: var(--dim);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: var(--space-1) var(--space-2);
+	cursor: pointer;
+	transition:
+		color var(--dur-fast),
+		border-color var(--dur-fast);
+}
+.copy-code-btn:hover {
+	color: var(--color-primary);
+	border-color: var(--color-primary);
+}
+
+/* ── Hero stagger animation (ported from RG-Digital/Site) ────────── */
+@keyframes hero-in {
+	from {
+		opacity: 0;
+		transform: translateY(22px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+[data-hero-reveal] {
+	animation: hero-in var(--dur-enter) var(--ease-out) both;
+}
+[data-hero-reveal='0'] {
+	animation-delay: 0s;
+}
+[data-hero-reveal='1'] {
+	animation-delay: 0.1s;
+}
+[data-hero-reveal='2'] {
+	animation-delay: 0.2s;
+}
+[data-hero-reveal='3'] {
+	animation-delay: 0.33s;
+}
+
+/* ── Scroll-reveal ─────────────────────────────────────────────── */
+.reveal-init {
+	opacity: 0;
+	transform: translateY(28px);
+	transition:
+		opacity var(--dur-enter) var(--ease-out),
+		transform var(--dur-enter) var(--ease-out);
+}
+.reveal-init.revealed {
+	opacity: 1;
+	transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-hero-reveal] {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
+	}
+	.reveal-init,
+	.reveal-init.revealed {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
+}
