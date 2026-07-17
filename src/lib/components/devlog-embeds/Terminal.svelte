@@ -1,7 +1,6 @@
 <script lang="ts">
-	// `lines` arrives as a plain string when set via a markdown data-lines
-	// attribute (data-* attributes can only ever be strings) — accept both
-	// a real array (programmatic use) and a JSON-encoded one (markdown use).
+	import { parseLines } from './parse-lines';
+
 	interface Props {
 		lines?: string[] | string;
 	}
@@ -9,15 +8,7 @@
 	let { lines: rawLines = ['echo "hello from a devlog embed"', 'hello from a devlog embed'] }: Props =
 		$props();
 
-	const lines = $derived.by(() => {
-		if (Array.isArray(rawLines)) return rawLines;
-		try {
-			const parsed = JSON.parse(rawLines);
-			return Array.isArray(parsed) ? parsed : [rawLines];
-		} catch {
-			return [rawLines];
-		}
-	});
+	const lines = $derived(parseLines(rawLines));
 
 	// Precompute every intermediate typing frame up front (plain arrays, no
 	// reactivity involved) so the interval below only ever does one $state

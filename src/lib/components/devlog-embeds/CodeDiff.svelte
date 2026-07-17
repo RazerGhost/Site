@@ -1,7 +1,6 @@
 <script lang="ts">
-	// `lines` arrives as a plain string when set via a markdown data-lines
-	// attribute — accept both a real array (programmatic use) and a
-	// JSON-encoded one (markdown use), same convention as Terminal.svelte.
+	import { parseLines } from './parse-lines';
+
 	// Each line is prefixed '+' (added), '-' (removed), or left bare (context).
 	interface Props {
 		lines?: string[] | string;
@@ -9,15 +8,7 @@
 
 	let { lines: rawLines = [] }: Props = $props();
 
-	const lines = $derived.by(() => {
-		if (Array.isArray(rawLines)) return rawLines;
-		try {
-			const parsed = JSON.parse(rawLines);
-			return Array.isArray(parsed) ? parsed : [rawLines];
-		} catch {
-			return [rawLines];
-		}
-	});
+	const lines = $derived(parseLines(rawLines));
 
 	function kind(line: string): 'add' | 'remove' | 'context' {
 		if (line.startsWith('+')) return 'add';

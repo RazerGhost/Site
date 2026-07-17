@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import { parseLines } from './parse-lines';
 
 	// `lines` arrives as a plain string when set via a markdown data-lines
 	// attribute — accept both a real array (programmatic use) and a
@@ -19,20 +20,11 @@
 		text: string;
 	}
 
-	const steps = $derived.by((): Step[] => {
-		let parsed: unknown = rawLines;
-		if (!Array.isArray(parsed)) {
-			try {
-				parsed = JSON.parse(rawLines as string);
-			} catch {
-				parsed = [rawLines];
-			}
-		}
-		const arr = Array.isArray(parsed) ? parsed : [String(parsed)];
-		return arr.map((line: string) =>
+	const steps = $derived.by((): Step[] =>
+		parseLines(rawLines).map((line) =>
 			line.startsWith('$ ') ? { type: 'cmd', text: line.slice(2) } : { type: 'out', text: line }
-		);
-	});
+		)
+	);
 
 	let visible = $state<Step[]>([]);
 	let typingText = $state('');

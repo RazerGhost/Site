@@ -1,7 +1,6 @@
 <script lang="ts">
-	// `lines` arrives as a plain string when set via a markdown data-lines
-	// attribute — accept both a real array (programmatic use) and a
-	// JSON-encoded one (markdown use), same convention as Terminal.svelte.
+	import { parseLines } from './parse-lines';
+
 	interface Props {
 		lines?: string[] | string;
 	}
@@ -9,15 +8,7 @@
 	let { lines: rawLines = ['graph TD', 'A[Write markdown] --> B[Embed a diagram]'] }: Props =
 		$props();
 
-	const source = $derived.by(() => {
-		if (Array.isArray(rawLines)) return rawLines.join('\n');
-		try {
-			const parsed = JSON.parse(rawLines);
-			return Array.isArray(parsed) ? parsed.join('\n') : rawLines;
-		} catch {
-			return rawLines;
-		}
-	});
+	const source = $derived(parseLines(rawLines).join('\n'));
 
 	let container: HTMLDivElement | undefined = $state();
 	let error = $state('');

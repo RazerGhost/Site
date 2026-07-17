@@ -42,3 +42,20 @@ redeploy, done. Exactly the same deal the devlog already had.
 This post is itself the first entry that isn't a devlog post *about*
 something built — it's the writeup for a feature that's also visible one
 click away, on [the projects page](/projects) itself.
+
+## Update: the copy became a share
+
+That "straight copy" didn't stay a copy for long. `devlog.ts` and
+`projects.ts` ended up with byte-identical `readEntryFile()` and
+`toDateString()` functions — same `gray-matter` call, same
+slug-from-filename logic, same fix for `gray-matter` parsing unquoted
+frontmatter dates into `Date` objects instead of strings. Two copies of the
+same fix is one more place for it to drift, so both now import
+`readEntryFile`/`toDateString` from a shared `src/lib/server/content.ts`
+instead of defining their own.
+
+Their `toMeta()`/`getAll()`/`get()` functions stayed separate, though —
+devlog posts have grown `series`, a table of contents, search text, and
+footnotes that projects don't need, so forcing both into one shape would've
+cost more than the duplication it removed. Share the part that's actually
+identical, not the part that just looks similar today.

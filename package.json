@@ -12,7 +12,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"start": "node build/index.js",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@icons-pack/svelte-simple-icons": "^7.2.0",
@@ -34,6 +35,7 @@
 		"svelte-check": "^4.1.1",
 		"tailwindcss": "^4.0.0",
 		"typescript": "^5.7.2",
-		"vite": "^6.0.7"
+		"vite": "^6.0.7",
+		"vitest": "^3.0.0"
 	}
 }
