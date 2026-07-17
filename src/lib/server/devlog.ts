@@ -15,6 +15,10 @@ export interface DevlogMeta {
 	readingTime: number;
 	searchText: string;
 	draft: boolean;
+	// Plain human-readable string shared across posts in the same series
+	// (e.g. "Shipping the Devlog Pipeline") — used directly as both the
+	// grouping key and the display label, matched by exact equality.
+	series?: string;
 }
 
 export interface TocEntry {
@@ -50,11 +54,63 @@ function toSearchText(body: string): string {
 		.replace(/`([^`]+)`/g, '$1')
 		.replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
 		.replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+		.replace(/^\[\^[\w-]+]:\s*.+$/gm, ' ')
+		.replace(/\[\^[\w-]+]/g, ' ')
 		.replace(/<[^>]+>/g, ' ')
 		.replace(/[#>*_~-]/g, ' ')
 		.replace(/\s+/g, ' ')
 		.trim()
 		.toLowerCase();
+}
+
+interface FootnoteEntry {
+	refId: string;
+	noteId: string;
+	html: string;
+}
+
+// Hand-rolled footnote support ([^label] refs + "[^label]: text" block
+// definitions), run on the raw markdown before marked.parse — same
+// independent-of-marked's-renderer-API approach as addHeadingAnchors below,
+// rather than pulling in a marked plugin for something this small.
+function applyFootnotes(body: string): { body: string; footnotes: FootnoteEntry[] } {
+	const defs = new Map<string, string>();
+	const withoutDefs = body.replace(/^\[\^([\w-]+)]:\s*(.+)$/gm, (_match, label, text) => {
+		defs.set(label, text);
+		return '';
+	});
+
+	if (defs.size === 0) return { body, footnotes: [] };
+
+	const order: string[] = [];
+	const withRefs = withoutDefs.replace(/\[\^([\w-]+)]/g, (match, label) => {
+		if (!defs.has(label)) return match;
+		let index = order.indexOf(label);
+		if (index === -1) {
+			order.push(label);
+			index = order.length - 1;
+		}
+		const n = index + 1;
+		return `<sup id="fnref-${n}"><a href="#fn-${n}" class="footnote-ref">${n}</a></sup>`;
+	});
+
+	const footnotes = order.map((label, i) => {
+		const n = i + 1;
+		return {
+			refId: `fnref-${n}`,
+			noteId: `fn-${n}`,
+			html: marked.parseInline(defs.get(label) ?? '', { async: false }) as string
+		};
+	});
+
+	return { body: withRefs, footnotes };
+}
+
+function renderFootnotesSection(footnotes: FootnoteEntry[]): string {
+	const items = footnotes
+		.map((f) => `<li id="${f.noteId}">${f.html} <a href="#${f.refId}" class="footnote-backref">↩</a></li>`)
+		.join('');
+	return `<section class="footnotes"><hr />\n<ol>${items}</ol></section>`;
 }
 
 // gray-matter (via js-yaml) parses unquoted frontmatter dates like
@@ -77,7 +133,8 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 		excerpt: String(meta.excerpt ?? ''),
 		readingTime: estimateReadingTime(body),
 		searchText: toSearchText(body),
-		draft: meta.draft === true
+		draft: meta.draft === true,
+		series: meta.series ? String(meta.series) : undefined
 	};
 }
 
@@ -85,6 +142,20 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 // shareable deep links into a post) by post-processing the rendered HTML
 // rather than hooking marked's renderer — keeps this independent of marked's
 // renderer API shape.
+// Undoes marked's HTML-escaping (&amp; &lt; &gt; &quot; &#39;) for text that
+// gets used as plain text (TOC labels) rather than re-inserted as HTML —
+// otherwise a heading like "--prod doesn't mean..." shows a literal "&#39;"
+// in the table of contents, since Svelte's {text} interpolation doesn't
+// decode entities the way {@html} does.
+function decodeHtmlEntities(text: string): string {
+	return text
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&amp;/g, '&');
+}
+
 function slugifyHeading(text: string): string {
 	return (
 		text
@@ -101,7 +172,7 @@ function addHeadingAnchors(html: string): { html: string; toc: TocEntry[] } {
 
 	const withIds = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_match, levelStr, inner) => {
 		const level = Number(levelStr) as 2 | 3;
-		const text = inner.replace(/<[^>]+>/g, '').trim();
+		const text = decodeHtmlEntities(inner.replace(/<[^>]+>/g, '').trim());
 		const base = slugifyHeading(text);
 		const count = seen.get(base) ?? 0;
 		seen.set(base, count + 1);
@@ -139,8 +210,10 @@ export function getDevlogEntry(slug: string): DevlogEntry | null {
 	if (!fs.existsSync(path.join(CONTENT_DIR, filename))) return null;
 
 	const { meta, body } = readEntryFile(filename);
-	const rawHtml = marked.parse(body, { async: false }) as string;
-	const { html, toc } = addHeadingAnchors(rawHtml);
+	const { body: bodyWithFootnoteRefs, footnotes } = applyFootnotes(body);
+	const rawHtml = marked.parse(bodyWithFootnoteRefs, { async: false }) as string;
+	const { html: htmlWithAnchors, toc } = addHeadingAnchors(rawHtml);
+	const html = footnotes.length ? htmlWithAnchors + renderFootnotesSection(footnotes) : htmlWithAnchors;
 
 	return { ...toMeta(slug, meta, body), html, toc };
 }

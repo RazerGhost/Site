@@ -12,13 +12,13 @@
 <div class="card rounded-lg border border-border bg-surface p-4">
 	{#if before && after}
 		<div class="relative aspect-video w-full overflow-hidden rounded-md select-none">
-			<img src={after} alt="after" class="absolute inset-0 h-full w-full object-cover" />
-			<div
-				class="absolute inset-0 h-full overflow-hidden"
-				style="width: {position}%"
-			>
-				<img src={before} alt="before" class="h-full w-full max-w-none object-cover" />
-			</div>
+			<img src={after} alt="after" class="absolute inset-0 h-full w-full object-contain" />
+			<img
+				src={before}
+				alt="before"
+				class="absolute inset-0 h-full w-full object-contain"
+				style="clip-path: inset(0 {100 - position}% 0 0)"
+			/>
 			<div
 				class="absolute inset-y-0 w-0.5 bg-primary"
 				style="left: {position}%"

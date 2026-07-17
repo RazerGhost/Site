@@ -92,6 +92,27 @@
 			</ul>
 		{/if}
 
+		{#if data.series}
+			<div class="mt-4 rounded-lg border border-primary/30 bg-surface p-4">
+				<p class="text-xs font-semibold tracking-wide text-primary uppercase">
+					{data.series.name} · Part {data.series.part} of {data.series.total}
+				</p>
+				<ol class="mt-3 space-y-1.5">
+					{#each data.series.parts as part, i}
+						<li class="text-sm">
+							{#if part.slug === data.entry.slug}
+								<span class="text-white">{i + 1}. {part.title}</span>
+							{:else}
+								<a href="/devlog/{part.slug}" class="text-gray hover:text-primary">
+									{i + 1}. {part.title}
+								</a>
+							{/if}
+						</li>
+					{/each}
+				</ol>
+			</div>
+		{/if}
+
 		<div class="mt-6">
 			<ShareButtons url={shareUrl} title={data.entry.title} />
 		</div>

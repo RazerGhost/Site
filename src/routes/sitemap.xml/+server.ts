@@ -17,8 +17,10 @@ function url(loc: string, date?: string): string {
 }
 
 export const GET: RequestHandler = () => {
-	const devlogUrls = getAllDevlogEntries().map((entry) =>
-		url(`/devlog/${entry.slug}`, entry.date)
+	const entries = getAllDevlogEntries();
+	const devlogUrls = entries.map((entry) => url(`/devlog/${entry.slug}`, entry.date));
+	const tagUrls = [...new Set(entries.flatMap((e) => e.tags))].map((tag) =>
+		url(`/devlog/tags/${tag}`)
 	);
 	const projectUrls = getAllProjects().map((project) =>
 		url(`/projects/${project.slug}`, project.date)
@@ -29,6 +31,7 @@ export const GET: RequestHandler = () => {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${[
 		...staticUrls,
 		...devlogUrls,
+		...tagUrls,
 		...projectUrls
 	].join('')}
 </urlset>`;

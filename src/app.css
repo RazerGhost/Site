@@ -133,6 +133,29 @@
 	color: var(--dim);
 }
 
+.devlog-content .footnote-ref a,
+.devlog-content .footnote-backref {
+	color: var(--color-primary);
+	text-decoration: none;
+}
+.devlog-content .footnotes {
+	margin-top: var(--space-8);
+	font-size: var(--fs-body-sm);
+	color: var(--dim);
+}
+.devlog-content .footnotes hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin-bottom: var(--space-4);
+}
+.devlog-content .footnotes ol {
+	list-style: decimal;
+	padding-left: var(--space-6);
+}
+.devlog-content .footnotes li + li {
+	margin-top: var(--space-2);
+}
+
 /* Copy button injected into <pre> blocks by src/lib/actions/copy-code.ts */
 .copy-code-btn {
 	position: absolute;

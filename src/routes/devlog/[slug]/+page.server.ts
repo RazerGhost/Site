@@ -24,5 +24,15 @@ export const load: PageServerLoad = ({ params }) => {
 		.slice(0, 3)
 		.map((e) => e.entry);
 
-	return { entry, older, newer, related };
+	// allEntries is already sorted oldest-first, so filtering to the shared
+	// `series` value keeps parts in chronological order for free.
+	const series = entry.series
+		? (() => {
+				const parts = allEntries.filter((e) => e.series === entry.series);
+				const part = parts.findIndex((e) => e.slug === params.slug) + 1;
+				return { name: entry.series as string, part, total: parts.length, parts };
+			})()
+		: null;
+
+	return { entry, older, newer, related, series };
 };

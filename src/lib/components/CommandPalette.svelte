@@ -9,8 +9,15 @@
 	interface Item {
 		label: string;
 		hint?: string;
+		search?: string;
 		action: () => void;
 	}
+
+	// Lazily-loaded fuller index (excerpt + stripped body text) keyed by
+	// slug, fetched once on first open — see /api/search.json. Keeps every
+	// page's initial load down to just entries (slug/title).
+	let fullIndex = $state<Record<string, { excerpt: string; searchText: string }>>({});
+	let indexRequested = false;
 
 	function toggleTheme() {
 		const stored = localStorage.getItem('theme');
@@ -37,11 +44,17 @@
 	const actionItems: Item[] = [{ label: 'Toggle theme', hint: 'Action', action: toggleTheme }];
 
 	const postItems = $derived(
-		entries.map((entry) => ({
-			label: entry.title,
-			hint: 'Devlog',
-			action: () => goto(`/devlog/${entry.slug}`)
-		}))
+		entries.map((entry) => {
+			const extra = fullIndex[entry.slug];
+			return {
+				label: entry.title,
+				hint: 'Devlog',
+				search: extra
+					? `${entry.title} ${extra.excerpt} ${extra.searchText}`.toLowerCase()
+					: entry.title.toLowerCase(),
+				action: () => goto(`/devlog/${entry.slug}`)
+			};
+		})
 	);
 
 	const allItems = $derived([...navItems, ...actionItems, ...postItems]);
@@ -53,7 +66,7 @@
 	const filtered = $derived.by(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return allItems;
-		return allItems.filter((item) => item.label.toLowerCase().includes(q));
+		return allItems.filter((item) => (item.search ?? item.label.toLowerCase()).includes(q));
 	});
 
 	$effect(() => {
@@ -65,6 +78,19 @@
 
 	$effect(() => {
 		if (commandPalette.open) inputEl?.focus();
+	});
+
+	$effect(() => {
+		if (!commandPalette.open || indexRequested) return;
+		indexRequested = true;
+		fetch('/api/search.json')
+			.then((r) => r.json())
+			.then((data: { slug: string; excerpt: string; searchText: string }[]) => {
+				fullIndex = Object.fromEntries(
+					data.map((d) => [d.slug, { excerpt: d.excerpt, searchText: d.searchText }])
+				);
+			})
+			.catch(() => {});
 	});
 
 	function close() {

@@ -1,15 +1,7 @@
 import { getAllDevlogEntries } from '$lib/server/devlog';
 import { site } from '$lib/config';
+import { escapeXml } from '$lib/server/xml';
 import type { RequestHandler } from './$types';
-
-function escapeXml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
-}
 
 export const GET: RequestHandler = () => {
 	const entries = getAllDevlogEntries();
