@@ -14,6 +14,7 @@ export interface DevlogMeta {
 	excerpt: string;
 	readingTime: number;
 	searchText: string;
+	draft: boolean;
 }
 
 export interface TocEntry {
@@ -75,7 +76,8 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 		cover: meta.cover ? String(meta.cover) : undefined,
 		excerpt: String(meta.excerpt ?? ''),
 		readingTime: estimateReadingTime(body),
-		searchText: toSearchText(body)
+		searchText: toSearchText(body),
+		draft: meta.draft === true
 	};
 }
 
@@ -112,6 +114,12 @@ function addHeadingAnchors(html: string): { html: string; toc: TocEntry[] } {
 	return { html: withIds, toc };
 }
 
+// Drafts (`draft: true` in frontmatter) are excluded here — this is what
+// backs the list page, RSS, sitemap, tag pages, and prev/next/related
+// computations, so leaving them out of this function keeps them unpublished
+// everywhere at once. getDevlogEntry() below deliberately does NOT filter,
+// so a draft is still viewable by anyone who has its direct URL — useful
+// for previewing a post before it goes live.
 export function getAllDevlogEntries(): DevlogMeta[] {
 	if (!fs.existsSync(CONTENT_DIR)) return [];
 
@@ -122,6 +130,7 @@ export function getAllDevlogEntries(): DevlogMeta[] {
 			const { slug, meta, body } = readEntryFile(filename);
 			return toMeta(slug, meta, body);
 		})
+		.filter((entry) => !entry.draft)
 		.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : a.slug.localeCompare(b.slug)));
 }
 

@@ -4,8 +4,10 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import SpotifyWidget from '$lib/components/SpotifyWidget.svelte';
+	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import type { LayoutProps } from './$types';
 
-	let { children } = $props();
+	let { data, children }: LayoutProps = $props();
 </script>
 
 <div class="relative flex min-h-screen flex-col bg-bg text-white">
@@ -17,4 +19,5 @@
 	<Footer />
 	<BackToTop />
 	<SpotifyWidget />
+	<CommandPalette entries={data.commandPaletteEntries} />
 </div>

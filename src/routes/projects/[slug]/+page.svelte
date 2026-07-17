@@ -12,7 +12,7 @@
 	title="{data.project.name} — RazerGhost"
 	description={data.project.description}
 	path="/projects/{data.project.slug}"
-	image={data.project.cover}
+	image={data.project.cover ?? `/projects/${data.project.slug}/og.png`}
 />
 
 <main class="mx-auto max-w-2xl px-6 py-16">

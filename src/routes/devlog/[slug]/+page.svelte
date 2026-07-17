@@ -44,7 +44,8 @@
 	title="{data.entry.title} — RazerGhost"
 	description={data.entry.excerpt}
 	path="/devlog/{data.entry.slug}"
-	image={data.entry.cover}
+	image={data.entry.cover ?? `/devlog/${data.entry.slug}/og.png`}
+	noindex={data.entry.draft}
 />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
@@ -53,6 +54,14 @@
 	</a>
 
 	<article class="mt-4">
+		{#if data.entry.draft}
+			<p
+				class="mb-4 inline-block rounded-full border border-warn/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warn"
+			>
+				Draft — not published
+			</p>
+		{/if}
+
 		{#if data.entry.cover}
 			<img
 				src={data.entry.cover}

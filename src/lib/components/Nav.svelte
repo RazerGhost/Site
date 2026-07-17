@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { navLinks } from '$lib/config';
+	import { commandPalette } from '$lib/stores/command-palette.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import Search from '@lucide/svelte/icons/search';
+
+	const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 </script>
 
 <header
@@ -28,6 +32,15 @@
 					</li>
 				{/each}
 			</ul>
+			<button
+				type="button"
+				onclick={() => (commandPalette.open = true)}
+				aria-label="Open command palette"
+				class="hidden items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-dim transition-colors hover:border-primary hover:text-primary sm:flex"
+			>
+				<Search size={13} aria-hidden="true" />
+				<kbd class="font-sans">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+			</button>
 			<ThemeToggle />
 		</div>
 	</nav>

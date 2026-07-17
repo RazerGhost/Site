@@ -5,12 +5,14 @@
 		title = site.name,
 		description = site.description,
 		path = '',
-		image
+		image,
+		noindex = false
 	}: {
 		title?: string;
 		description?: string;
 		path?: string;
 		image?: string;
+		noindex?: boolean;
 	} = $props();
 
 	const url = $derived(`${site.url}${path}`);
@@ -24,6 +26,9 @@
 	<title>{title}</title>
 	<meta name="description" content={description} />
 	<link rel="canonical" href={url} />
+	{#if noindex}
+		<meta name="robots" content="noindex, nofollow" />
+	{/if}
 
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content={site.name} />
