@@ -2,6 +2,7 @@
 	import { reveal } from '$lib/actions/reveal';
 	import Seo from '$lib/components/Seo.svelte';
 	import ProjectCard from '$lib/components/ProjectCard.svelte';
+	import Rss from '@lucide/svelte/icons/rss';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -10,7 +11,15 @@
 <Seo title="Projects — RazerGhost" description="Things I've built." path="/projects" />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
-	<h1 class="text-3xl font-extrabold tracking-tight text-white" data-hero-reveal="0">Projects</h1>
+	<div class="flex items-baseline justify-between" data-hero-reveal="0">
+		<h1 class="text-3xl font-extrabold tracking-tight text-white">Projects</h1>
+		<a
+			href="/projects/rss.xml"
+			class="link flex items-center gap-1.5 text-sm text-dim hover:text-primary"
+		>
+			<Rss size={14} aria-hidden="true" /> RSS
+		</a>
+	</div>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Things I've built, in progress or otherwise.</p>
 
 	<div class="mt-10 grid gap-4" use:reveal>

@@ -36,3 +36,25 @@ export const navLinks = [
   { label: "Status", href: "/status" },
   { label: "Gear", href: "/gear" },
 ];
+
+// Comments on devlog posts, via giscus (https://giscus.app) — backed by
+// GitHub Discussions on this repo. Not secret (same "public identifier"
+// status as discordUserId above), so it lives here rather than in an env
+// var. Comments.svelte renders nothing until repoId/categoryId are filled in.
+//
+// One-time setup (repo admin):
+// 1. Enable Discussions on https://github.com/RazerGhost/Site
+//    (repo Settings → Features → Discussions)
+// 2. Visit https://giscus.app, enter the repo, pick a discussion category
+//    (e.g. "General" or a dedicated "Comments" category), and copy the
+//    repoId/categoryId values it generates into this object.
+export const giscus = {
+  repo: "RazerGhost/Site" as const,
+  repoId: "",
+  category: "General",
+  categoryId: "",
+};
+
+export function giscusConfigured(): boolean {
+  return Boolean(giscus.repoId && giscus.categoryId);
+}

@@ -26,6 +26,16 @@ function readEntryFile(filename: string) {
 	return { slug: filename.replace(/\.md$/, ''), meta: data, body: content };
 }
 
+// gray-matter (via js-yaml) parses unquoted frontmatter dates like
+// `date: 2026-06-01` into native Date objects, not strings — String(date)
+// on those yields a verbose, timezone-dependent format ("Mon Jun 01 2026
+// 02:00:00 GMT+0200...") that doesn't sort lexicographically. Normalize
+// to YYYY-MM-DD so date comparisons (list sort) work correctly.
+function toDateString(value: unknown): string {
+	if (value instanceof Date) return value.toISOString().slice(0, 10);
+	return String(value ?? '');
+}
+
 function toMeta(slug: string, meta: Record<string, unknown>): ProjectMeta {
 	return {
 		slug,
@@ -35,7 +45,7 @@ function toMeta(slug: string, meta: Record<string, unknown>): ProjectMeta {
 		live: meta.live ? String(meta.live) : undefined,
 		cover: meta.cover ? String(meta.cover) : undefined,
 		tags: Array.isArray(meta.tags) ? (meta.tags as string[]) : [],
-		date: String(meta.date ?? '')
+		date: toDateString(meta.date)
 	};
 }
 

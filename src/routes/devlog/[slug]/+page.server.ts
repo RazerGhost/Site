@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getDevlogEntry } from '$lib/server/devlog';
+import { getAllDevlogEntries, getDevlogEntry } from '$lib/server/devlog';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
@@ -9,5 +9,20 @@ export const load: PageServerLoad = ({ params }) => {
 		error(404, 'Devlog entry not found');
 	}
 
-	return { entry };
+	// getAllDevlogEntries() is sorted oldest-first, so the entry immediately
+	// before this one in the array is older and the one after is newer.
+	const allEntries = getAllDevlogEntries();
+	const index = allEntries.findIndex((e) => e.slug === params.slug);
+	const older = index > 0 ? allEntries[index - 1] : null;
+	const newer = index >= 0 && index < allEntries.length - 1 ? allEntries[index + 1] : null;
+
+	const related = allEntries
+		.filter((e) => e.slug !== params.slug)
+		.map((e) => ({ entry: e, shared: e.tags.filter((tag) => entry.tags.includes(tag)).length }))
+		.filter((e) => e.shared > 0)
+		.sort((a, b) => b.shared - a.shared || (a.entry.date > b.entry.date ? -1 : 1))
+		.slice(0, 3)
+		.map((e) => e.entry);
+
+	return { entry, older, newer, related };
 };

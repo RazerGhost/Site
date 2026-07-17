@@ -17,7 +17,11 @@
 		const q = query.trim().toLowerCase();
 		return data.entries.filter((e) => {
 			const matchesTag = !tag || e.tags.includes(tag);
-			const matchesQuery = !q || e.title.toLowerCase().includes(q) || e.excerpt.toLowerCase().includes(q);
+			const matchesQuery =
+				!q ||
+				e.title.toLowerCase().includes(q) ||
+				e.excerpt.toLowerCase().includes(q) ||
+				e.searchText.includes(q);
 			return matchesTag && matchesQuery;
 		});
 	});
