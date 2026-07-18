@@ -468,7 +468,7 @@
     {:else}
         {#if data.stale}
             <div class="mt-6 flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs text-dim">
-                <AlertTriangle size={14} class="shrink-0 text-primary" aria-hidden="true" />
+                <AlertTriangle size={14} class="shrink-0 text-warn" aria-hidden="true" />
                 <p>
                     Simkl's unreachable right now — showing a cached copy from {formatStaleSince(
                         data.staleSince
