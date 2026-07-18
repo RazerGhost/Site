@@ -25,7 +25,7 @@
 <Seo title={site.name} description={site.description} path="/" />
 
 <main class="mx-auto max-w-5xl px-6 py-16">
-	<div class="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+	<div class="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
 		<section
 			class="card flex flex-col items-center gap-4 rounded-lg border border-border bg-surface p-6 text-center sm:col-span-2 sm:flex-row sm:text-left lg:col-span-3"
 		>
@@ -57,10 +57,7 @@
 			</ul>
 		</section>
 
-		<section
-			class="card rounded-lg border border-border bg-surface p-6 lg:col-span-2 lg:row-span-2"
-			use:reveal
-		>
+		<section class="card rounded-lg border border-border bg-surface p-6 lg:col-span-2" use:reveal>
 			<h2 class="text-xl font-bold text-white">Right now</h2>
 
 			<div class="mt-6 grid gap-6 sm:grid-cols-2">
@@ -81,60 +78,62 @@
 			</div>
 		</section>
 
-		<section class="card rounded-lg border border-border bg-surface p-6" use:reveal>
-			<div class="flex items-baseline justify-between">
-				<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
-					<Music size={13} aria-hidden="true" /> Listening
-				</h2>
-				<a href="/listens" class="link text-xs text-primary hover:opacity-85">See all</a>
-			</div>
-
-			{#if data.topTrack}
-				<p class="mt-4 truncate text-sm font-medium text-white">{data.topTrack.track}</p>
-				<p class="truncate text-sm text-dim">{data.topTrack.artist}</p>
-				<p class="mt-3 text-xs text-dim">
-					{data.topTrack.plays} plays · top track · {data.totalPlays.toLocaleString()} plays logged
-				</p>
-			{:else}
-				<p class="mt-4 text-sm text-dim">No listening history imported yet.</p>
-			{/if}
-		</section>
-
-		<section class="card rounded-lg border border-border bg-surface p-6" use:reveal>
-			<div class="flex items-baseline justify-between">
-				<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
-					<Clapperboard size={13} aria-hidden="true" /> Watching
-				</h2>
-				<a href="/watchlist" class="link text-xs text-primary hover:opacity-85">See all</a>
-			</div>
-
-			{#if data.watching}
-				<div class="mt-4 flex gap-3">
-					{#if data.watching.posterUrl}
-						<img
-							src={data.watching.posterUrl}
-							alt=""
-							class="h-20 w-14 shrink-0 rounded-md object-cover"
-						/>
-					{/if}
-					<div class="min-w-0">
-						<p class="truncate text-sm font-medium text-white">{data.watching.title}</p>
-						{#if data.watching.nextToWatch}
-							<p class="mt-1 text-xs text-dim">Next: {data.watching.nextToWatch}</p>
-						{/if}
-						{#if data.watching.totalEpisodes}
-							<p class="mt-1 text-xs text-dim">
-								{data.watching.watchedEpisodes}/{data.watching.totalEpisodes} episodes
-							</p>
-						{/if}
-					</div>
+		<div class="flex flex-col gap-4">
+			<section class="card flex flex-1 flex-col rounded-lg border border-border bg-surface p-6" use:reveal>
+				<div class="flex items-baseline justify-between">
+					<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
+						<Music size={13} aria-hidden="true" /> Listens
+					</h2>
+					<a href="/listens" class="link text-xs text-primary hover:opacity-85">See all</a>
 				</div>
-			{:else}
-				<p class="mt-4 text-sm text-dim">Nothing in progress right now.</p>
-			{/if}
-		</section>
 
-		<section class="card rounded-lg border border-border bg-surface p-6 lg:col-span-3" use:reveal>
+				{#if data.topTrack}
+					<p class="mt-4 truncate text-sm font-medium text-white">{data.topTrack.track}</p>
+					<p class="truncate text-sm text-dim">{data.topTrack.artist}</p>
+					<p class="mt-3 text-xs text-dim">
+						{data.topTrack.plays} plays · top track · {data.totalPlays.toLocaleString()} plays logged
+					</p>
+				{:else}
+					<p class="mt-4 text-sm text-dim">No listening history imported yet.</p>
+				{/if}
+			</section>
+
+			<section class="card flex flex-1 flex-col rounded-lg border border-border bg-surface p-6" use:reveal>
+				<div class="flex items-baseline justify-between">
+					<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
+						<Clapperboard size={13} aria-hidden="true" /> Watching
+					</h2>
+					<a href="/watchlist" class="link text-xs text-primary hover:opacity-85">See all</a>
+				</div>
+
+				{#if data.watching}
+					<div class="mt-4 flex gap-3">
+						{#if data.watching.posterUrl}
+							<img
+								src={data.watching.posterUrl}
+								alt=""
+								class="h-20 w-14 shrink-0 rounded-md object-cover"
+							/>
+						{/if}
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium text-white">{data.watching.title}</p>
+							{#if data.watching.nextToWatch}
+								<p class="mt-1 text-xs text-dim">Next: {data.watching.nextToWatch}</p>
+							{/if}
+							{#if data.watching.totalEpisodes}
+								<p class="mt-1 text-xs text-dim">
+									{data.watching.watchedEpisodes}/{data.watching.totalEpisodes} episodes
+								</p>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<p class="mt-4 text-sm text-dim">Nothing in progress right now.</p>
+				{/if}
+			</section>
+		</div>
+
+		<section class="card rounded-lg border border-border bg-surface p-6 sm:col-span-2 lg:col-span-3" use:reveal>
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-xl font-bold text-white">Latest</h2>
 				<a
@@ -167,6 +166,7 @@
 		<a
 			href="https://rg-digital.dev/about"
 			target="_blank"
+			rel="noopener noreferrer"
 			class="link relative mt-2 inline-flex items-center gap-1 text-sm text-primary hover:opacity-85"
 		>
 			See my work at RG Digital <ArrowRight size={15} aria-hidden="true" />
