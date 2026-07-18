@@ -3,8 +3,10 @@
     import ListeningNowCard from "$lib/components/ListeningNowCard.svelte";
     import Music from "@lucide/svelte/icons/music";
     import Search from "@lucide/svelte/icons/search";
+    import X from "@lucide/svelte/icons/x";
     import { reveal } from "$lib/actions/reveal";
     import { goto } from "$app/navigation";
+    import { fly } from "svelte/transition";
     import type { PageData } from "./$types";
 
     let { data }: { data: PageData } = $props();
@@ -95,47 +97,75 @@
     });
 
     // --- Search ---
+    type SearchResult = {
+        track: string;
+        artist: string;
+        album: string | null;
+        plays: number;
+        spotifyUri: string | null;
+    };
+
     let query = $state("");
-    let searchResults = $state<
-        {
-            track: string;
-            artist: string;
-            plays: number;
-            spotifyUri: string | null;
-        }[]
-    >([]);
+    let searchResults = $state<SearchResult[]>([]);
+    let searching = $state(false);
+    let searchedFor = $state("");
     let searchTimeout: ReturnType<typeof setTimeout>;
-    let showResults = $state(false);
-    let searchContainerEl = $state<HTMLDivElement>();
+
+    // Album art isn't in our own DB (only the track/artist/album text is) —
+    // fetch it lazily per result from Spotify's public oEmbed endpoint, which
+    // needs no auth/token. Cached by URI so re-running a search is instant
+    // and we never re-fetch art we already have.
+    let artCache = $state<Record<string, string | null>>({});
+
+    async function fetchArt(uri: string) {
+        if (uri in artCache) return;
+        artCache[uri] = null;
+        try {
+            const trackId = uri.split(":").pop();
+            const res = await fetch(
+                `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`,
+            );
+            if (!res.ok) return;
+            const body = await res.json();
+            if (body.thumbnail_url) artCache[uri] = body.thumbnail_url;
+        } catch {
+            // Art is a nice-to-have — the card still works without it.
+        }
+    }
 
     function onSearchInput() {
-        showResults = true;
         clearTimeout(searchTimeout);
         const q = query.trim();
         if (q.length < 2) {
+            searching = false;
             searchResults = [];
+            searchedFor = "";
             return;
         }
+        searching = true;
         searchTimeout = setTimeout(async () => {
             const res = await fetch(
                 `/api/listening/search?q=${encodeURIComponent(q)}`,
             );
             const body = await res.json();
             searchResults = body.results ?? [];
+            searchedFor = q;
+            searching = false;
+            for (const r of searchResults as SearchResult[]) {
+                if (r.spotifyUri) fetchArt(r.spotifyUri);
+            }
         }, 250);
     }
 
-    function onDocumentClick(e: MouseEvent) {
-        if (
-            searchContainerEl &&
-            !searchContainerEl.contains(e.target as Node)
-        ) {
-            showResults = false;
-        }
+    function clearSearch() {
+        query = "";
+        searchResults = [];
+        searchedFor = "";
+        searching = false;
     }
 
     function onSearchKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") showResults = false;
+        if (e.key === "Escape") clearSearch();
     }
 
     // --- Artist drill-down ---
@@ -157,8 +187,6 @@
         artistTracks = body.tracks ?? [];
     }
 </script>
-
-<svelte:window onclick={onDocumentClick} />
 
 <Seo
     title="Listens — RazerGhost"
@@ -207,46 +235,88 @@
             <ListeningNowCard />
         </div>
 
-        <div class="relative mt-6" bind:this={searchContainerEl} use:reveal>
-            <Search
-                size={15}
-                class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-dim"
-                aria-hidden="true"
-            />
-            <input
-                type="search"
-                placeholder="Search your listening history…"
-                class="w-full rounded-lg border border-border bg-surface py-2 pr-3 pl-9 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
-                bind:value={query}
-                oninput={onSearchInput}
-                onkeydown={onSearchKeydown}
-            />
-            {#if showResults && searchResults.length}
-                <ul
-                    class="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-[var(--shadow-card-hover)]"
+        <div class="mt-6" use:reveal>
+            <div class="relative">
+                <Search
+                    size={15}
+                    class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-dim"
+                    aria-hidden="true"
+                />
+                <input
+                    type="search"
+                    placeholder="Search your listening history…"
+                    class="w-full rounded-lg border border-border bg-surface py-2 pr-9 pl-9 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
+                    bind:value={query}
+                    oninput={onSearchInput}
+                    onkeydown={onSearchKeydown}
+                />
+                {#if query}
+                    <button
+                        type="button"
+                        aria-label="Clear search"
+                        onclick={clearSearch}
+                        class="absolute top-1/2 right-3 -translate-y-1/2 text-dim hover:text-white"
+                    >
+                        <X size={15} aria-hidden="true" />
+                    </button>
+                {/if}
+            </div>
+
+            {#if searching}
+                <p class="mt-4 text-xs text-dim">Searching…</p>
+            {:else if searchedFor && !searchResults.length}
+                <p class="mt-4 text-xs text-dim">
+                    No plays match "{searchedFor}".
+                </p>
+            {:else if searchResults.length}
+                <div
+                    class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
                 >
-                    {#each searchResults as r}
+                    {#each searchResults as r, i (r.spotifyUri ?? r.track + r.artist)}
                         {@const href = trackHref(r.spotifyUri)}
-                        <li>
-                            <a
-                                {href}
-                                target={href ? "_blank" : undefined}
-                                rel="noreferrer"
-                                onclick={() => (showResults = false)}
-                                class="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-surface-2"
+                        {@const art = r.spotifyUri ? artCache[r.spotifyUri] : null}
+                        <a
+                            {href}
+                            target={href ? "_blank" : undefined}
+                            rel="noreferrer"
+                            in:fly={{ y: 8, duration: 200, delay: i * 20 }}
+                            class="group flex flex-col gap-2 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-primary hover:bg-surface-2"
+                        >
+                            <div
+                                class="relative aspect-square w-full overflow-hidden rounded-md bg-surface-2"
                             >
-                                <span class="min-w-0 flex-1 truncate text-white"
-                                    >{r.track}
-                                    <span class="text-dim">— {r.artist}</span
-                                    ></span
+                                {#if art}
+                                    <img
+                                        src={art}
+                                        alt=""
+                                        class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                    />
+                                {:else}
+                                    <div
+                                        class="flex h-full w-full items-center justify-center"
+                                    >
+                                        <Music
+                                            size={20}
+                                            class="text-dim"
+                                            aria-hidden="true"
+                                        />
+                                    </div>
+                                {/if}
+                            </div>
+                            <div class="min-w-0">
+                                <p
+                                    class="truncate text-sm font-medium text-white group-hover:text-primary"
                                 >
-                                <span class="shrink-0 text-xs text-dim"
-                                    >{r.plays} plays</span
-                                >
-                            </a>
-                        </li>
+                                    {r.track}
+                                </p>
+                                <p class="truncate text-xs text-dim">{r.artist}</p>
+                            </div>
+                            <p class="text-xs text-dim">
+                                {r.plays} play{r.plays === 1 ? "" : "s"}
+                            </p>
+                        </a>
                     {/each}
-                </ul>
+                </div>
             {/if}
         </div>
 

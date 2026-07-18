@@ -258,14 +258,20 @@ export function getOnThisDay(monthDay: string, excludeYear: number): OnThisDayEn
 	return result;
 }
 
-export type SearchResult = { track: string; artist: string; plays: number; spotifyUri: string | null };
+export type SearchResult = {
+	track: string;
+	artist: string;
+	album: string | null;
+	plays: number;
+	spotifyUri: string | null;
+};
 
 // Simple substring search over track/artist, ranked by play count.
 export function searchPlays(query: string): SearchResult[] {
 	const like = `%${query}%`;
 	return getDb()
 		.prepare(
-			`SELECT track, artist, COUNT(*) as plays, spotify_uri as spotifyUri
+			`SELECT track, artist, album, COUNT(*) as plays, spotify_uri as spotifyUri
 			 FROM plays WHERE track LIKE @like OR artist LIKE @like
 			 GROUP BY track, artist ORDER BY plays DESC LIMIT 20`
 		)
