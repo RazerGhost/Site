@@ -35,6 +35,7 @@ export const navLinks = [
   { label: "Devlog", href: "/devlog" },
   { label: "Status", href: "/status" },
   { label: "Gear", href: "/gear" },
+  { label: "Watching", href: "/watching" },
 ];
 
 // Comments on devlog posts, via giscus (https://giscus.app) — backed by
