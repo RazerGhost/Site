@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-	addHeadingAnchors,
-	applyFootnotes,
-	decodeHtmlEntities,
-	slugifyHeading,
-	toSearchText
-} from './devlog';
+import { addHeadingAnchors, decodeHtmlEntities, slugifyHeading } from './content';
+import { applyFootnotes, toSearchText } from './devlog';
 
 describe('applyFootnotes', () => {
 	it('leaves body untouched when there are no footnote definitions', () => {

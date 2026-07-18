@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fail, redirect } from '@sveltejs/kit';
 import { writeEntry } from '$lib/server/content-editor';
-import { slugifyHeading } from '$lib/server/devlog';
+import { slugifyHeading } from '$lib/server/content';
 import type { Actions } from './$types';
 
 const CONTENT_DIR = path.resolve(process.cwd(), 'src/content/devlog');

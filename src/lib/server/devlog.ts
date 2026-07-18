@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
-import { readEntryFile, toDateString } from './content';
+import {
+	readEntryFile,
+	toDateString,
+	addHeadingAnchors,
+	type TocEntry
+} from './content';
 
 const CONTENT_DIR = path.resolve(process.cwd(), 'src/content/devlog');
 
@@ -19,12 +24,6 @@ export interface DevlogMeta {
 	// (e.g. "Shipping the Devlog Pipeline") — used directly as both the
 	// grouping key and the display label, matched by exact equality.
 	series?: string;
-}
-
-export interface TocEntry {
-	id: string;
-	text: string;
-	level: 2 | 3;
 }
 
 export interface DevlogEntry extends DevlogMeta {
@@ -120,53 +119,6 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 		draft: meta.draft === true,
 		series: meta.series ? String(meta.series) : undefined
 	};
-}
-
-// Gives every h2/h3 a stable, unique id (for the table of contents and
-// shareable deep links into a post) by post-processing the rendered HTML
-// rather than hooking marked's renderer — keeps this independent of marked's
-// renderer API shape.
-// Undoes marked's HTML-escaping (&amp; &lt; &gt; &quot; &#39;) for text that
-// gets used as plain text (TOC labels) rather than re-inserted as HTML —
-// otherwise a heading like "--prod doesn't mean..." shows a literal "&#39;"
-// in the table of contents, since Svelte's {text} interpolation doesn't
-// decode entities the way {@html} does.
-export function decodeHtmlEntities(text: string): string {
-	return text
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&amp;/g, '&');
-}
-
-export function slugifyHeading(text: string): string {
-	return (
-		text
-			.toLowerCase()
-			.trim()
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/(^-|-$)/g, '') || 'section'
-	);
-}
-
-export function addHeadingAnchors(html: string): { html: string; toc: TocEntry[] } {
-	const toc: TocEntry[] = [];
-	const seen = new Map<string, number>();
-
-	const withIds = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_match, levelStr, inner) => {
-		const level = Number(levelStr) as 2 | 3;
-		const text = decodeHtmlEntities(inner.replace(/<[^>]+>/g, '').trim());
-		const base = slugifyHeading(text);
-		const count = seen.get(base) ?? 0;
-		seen.set(base, count + 1);
-		const id = count > 0 ? `${base}-${count}` : base;
-
-		toc.push({ id, text, level });
-		return `<h${level} id="${id}">${inner}</h${level}>`;
-	});
-
-	return { html: withIds, toc };
 }
 
 // Drafts (`draft: true` in frontmatter) are excluded here — this is what

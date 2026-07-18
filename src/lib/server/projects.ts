@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
-import { readEntryFile, toDateString } from './content';
+import { readEntryFile, toDateString, addHeadingAnchors, type TocEntry } from './content';
 
 const CONTENT_DIR = path.resolve(process.cwd(), 'src/content/projects');
 
@@ -18,6 +18,7 @@ export interface ProjectMeta {
 
 export interface ProjectEntry extends ProjectMeta {
 	html: string;
+	toc: TocEntry[];
 }
 
 function toMeta(slug: string, meta: Record<string, unknown>): ProjectMeta {
@@ -51,7 +52,8 @@ export function getProject(slug: string): ProjectEntry | null {
 	if (!fs.existsSync(path.join(CONTENT_DIR, filename))) return null;
 
 	const { meta, body } = readEntryFile(CONTENT_DIR, filename);
-	const html = marked.parse(body, { async: false }) as string;
+	const rawHtml = marked.parse(body, { async: false }) as string;
+	const { html, toc } = addHeadingAnchors(rawHtml);
 
-	return { ...toMeta(slug, meta), html };
+	return { ...toMeta(slug, meta), html, toc };
 }
