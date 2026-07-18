@@ -36,7 +36,7 @@ export async function exchangeCodeForToken(code: string, redirectUri: string): P
 	return data.access_token;
 }
 
-export async function fetchGithubLogin(accessToken: string): Promise<string> {
+export async function fetchGithubUser(accessToken: string): Promise<{ id: number; login: string }> {
 	const res = await fetch('https://api.github.com/user', {
 		headers: {
 			Authorization: `Bearer ${accessToken}`,
@@ -48,6 +48,8 @@ export async function fetchGithubLogin(accessToken: string): Promise<string> {
 	if (!res.ok) throw new Error(`GitHub user fetch failed: ${res.status}`);
 
 	const data = await res.json();
-	if (typeof data.login !== 'string') throw new Error('GitHub user fetch: missing login');
-	return data.login;
+	if (typeof data.id !== 'number' || typeof data.login !== 'string') {
+		throw new Error('GitHub user fetch: missing id/login');
+	}
+	return { id: data.id, login: data.login };
 }

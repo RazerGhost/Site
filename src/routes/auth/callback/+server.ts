@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { site } from '$lib/config';
-import { exchangeCodeForToken, fetchGithubLogin } from '$lib/server/github-auth';
+import { exchangeCodeForToken, fetchGithubUser } from '$lib/server/github-auth';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '$lib/server/session';
 import type { RequestHandler } from './$types';
 
@@ -28,14 +28,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	}
 
 	let login: string;
+	let id: number;
 	try {
 		const accessToken = await exchangeCodeForToken(code, `${url.origin}/auth/callback`);
-		login = await fetchGithubLogin(accessToken);
+		({ id, login } = await fetchGithubUser(accessToken));
 	} catch {
 		denied('error');
 	}
 
-	if (login.toLowerCase() !== site.githubUsername.toLowerCase()) {
+	if (id !== site.githubUserId) {
 		denied('not-owner');
 	}
 

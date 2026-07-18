@@ -4,6 +4,10 @@ export const site = {
   url: "https://razerghost.xyz",
   description: "Personal link hub and devlog.",
   githubUsername: "RazerGhost",
+  // Numeric GitHub user ID (immutable, unlike the username) — this is what
+  // auth actually checks against, so a future username change/reclaim can't
+  // let someone else in. From https://api.github.com/users/RazerGhost.
+  githubUserId: 90572937,
   // Discord user ID (not secret — Discord IDs are public), used by Lanyard
   // (https://github.com/Phineas/lanyard) to show live presence. For this to
   // return data, this Discord account must have joined Lanyard's Discord
