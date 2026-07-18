@@ -9,7 +9,7 @@
 </script>
 
 {#snippet grid(items: LibraryItem[])}
-	<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3" use:reveal>
+	<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
 		{#each items as item, i (item.href)}
 			<a
 				href={item.href}
@@ -17,6 +17,7 @@
 				rel="noreferrer"
 				class="card group overflow-hidden rounded-lg border border-border bg-surface/50 transition-colors hover:border-primary"
 				style="transition-delay: {Math.min(i, 12) * 60}ms"
+				use:reveal
 			>
 				<div class="aspect-[2/3] w-full overflow-hidden bg-surface-2">
 					{#if item.posterUrl}
