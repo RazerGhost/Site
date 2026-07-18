@@ -62,6 +62,7 @@
 	let query = $state('');
 	let selectedIndex = $state(0);
 	let inputEl = $state<HTMLInputElement>();
+	let listEl = $state<HTMLUListElement>();
 
 	const filtered = $derived.by(() => {
 		const q = query.trim().toLowerCase();
@@ -78,6 +79,11 @@
 
 	$effect(() => {
 		if (commandPalette.open) inputEl?.focus();
+	});
+
+	$effect(() => {
+		selectedIndex;
+		listEl?.querySelector(`[data-index="${selectedIndex}"]`)?.scrollIntoView({ block: 'nearest' });
 	});
 
 	$effect(() => {
@@ -153,11 +159,12 @@
 				/>
 				<kbd class="rounded border border-border px-1.5 py-0.5 text-xs text-dim">Esc</kbd>
 			</div>
-			<ul class="max-h-80 overflow-y-auto p-2">
+			<ul bind:this={listEl} class="max-h-80 overflow-y-auto p-2">
 				{#each filtered as item, i (item.label + i)}
 					<li>
 						<button
 							type="button"
+							data-index={i}
 							onclick={() => select(item)}
 							onmouseenter={() => (selectedIndex = i)}
 							class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm {i ===
