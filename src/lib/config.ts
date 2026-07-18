@@ -119,4 +119,5 @@ export const navLinks = [
   { label: "Status", href: "/status" },
   { label: "Gear", href: "/gear" },
   { label: "Watchlist", href: "/watchlist" },
+  { label: "Listening", href: "/listening" },
 ];
