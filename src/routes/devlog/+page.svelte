@@ -10,7 +10,22 @@
 	let selectedTag = $state<string | null>(null);
 	let query = $state('');
 
-	const tags = $derived([...new Set(data.entries.flatMap((e) => e.tags))].sort());
+	const tagCounts = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const entry of data.entries) {
+			for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+		}
+		return counts;
+	});
+	const tags = $derived([...tagCounts.keys()].sort());
+
+	const latestDate = $derived(
+		data.entries.reduce<string | null>((max, e) => (!max || e.date > max ? e.date : max), null)
+	);
+
+	function formatDate(iso: string): string {
+		return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	}
 
 	const filtered = $derived.by(() => {
 		const tag = selectedTag;
@@ -33,7 +48,7 @@
 
 <Seo title="Devlog — RazerGhost" description="Notes on whatever I'm building at the moment." path="/devlog" />
 
-<main class="mx-auto max-w-2xl px-6 py-16">
+<main class="mx-auto max-w-6xl px-6 py-16">
 	<div class="flex items-baseline justify-between" data-hero-reveal="0">
 		<h1 class="text-3xl font-extrabold tracking-tight text-white">Devlog</h1>
 		<a
@@ -44,6 +59,21 @@
 		</a>
 	</div>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Notes on whatever I'm building at the moment.</p>
+
+	<div class="mt-6 grid grid-cols-3 gap-4 rounded-lg border border-border p-4 text-center" data-hero-reveal="2">
+		<div>
+			<p class="text-xl font-bold text-white">{data.entries.length}</p>
+			<p class="mt-0.5 text-xs text-dim">Posts</p>
+		</div>
+		<div>
+			<p class="text-xl font-bold text-white">{tags.length}</p>
+			<p class="mt-0.5 text-xs text-dim">Tags</p>
+		</div>
+		<div>
+			<p class="text-xl font-bold text-white">{latestDate ? formatDate(latestDate) : '—'}</p>
+			<p class="mt-0.5 text-xs text-dim">Latest post</p>
+		</div>
+	</div>
 
 	<input
 		type="search"
@@ -61,7 +91,7 @@
 						: 'border-border text-gray'}"
 					onclick={() => (selectedTag = null)}
 				>
-					All
+					All <span class="text-dim">{data.entries.length}</span>
 				</button>
 			</li>
 			{#each tags as tag}
@@ -72,14 +102,14 @@
 							: 'border-border text-gray'}"
 						onclick={() => toggleTag(tag)}
 					>
-						{tag}
+						{tag} <span class="text-dim">{tagCounts.get(tag)}</span>
 					</button>
 				</li>
 			{/each}
 		</ul>
 	{/if}
 
-	<div class="mt-8 grid gap-4" use:reveal>
+	<div class="mt-8 grid gap-4 sm:grid-cols-2" use:reveal>
 		{#each filtered as entry (entry.slug)}
 			<DevlogCard {entry} />
 		{:else}

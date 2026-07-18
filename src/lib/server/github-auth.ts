@@ -41,7 +41,7 @@ export async function fetchGithubLogin(accessToken: string): Promise<string> {
 		headers: {
 			Authorization: `Bearer ${accessToken}`,
 			// GitHub's API rejects unauthenticated-looking requests without one.
-			'User-Agent': 'razerghost-site'
+			'User-Agent': 'ghostbase'
 		}
 	});
 

@@ -3,7 +3,7 @@ import { getAllProjects } from '$lib/server/projects';
 import { site } from '$lib/config';
 import type { RequestHandler } from './$types';
 
-const STATIC_ROUTES = ['/', '/projects', '/devlog', '/status', '/gear', '/watchlist', '/listening'];
+const STATIC_ROUTES = ['/', '/projects', '/devlog', '/gear', '/watchlist', '/listens'];
 
 function url(loc: string, date?: string): string {
 	// Frontmatter dates come back from gray-matter as parsed Date objects

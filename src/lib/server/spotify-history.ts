@@ -1,8 +1,17 @@
-import { insertPlays, getListeningStats } from './spotify-history-db';
+import { insertPlays, getListeningStats, deleteScrobbledRange } from './spotify-history-db';
 import type { PlayRecord } from './spotify-history-db';
 
-export type { ListeningStats } from './spotify-history-db';
-export { getListeningStats };
+export type { ListeningStats, TrackHistory, SearchResult } from './spotify-history-db';
+export {
+	getListeningStats,
+	getAvailableYears,
+	getHeatmap,
+	getHourlyBreakdown,
+	getTrackHistory,
+	searchPlays,
+	getArtistTopTracks,
+	getOnThisDay
+} from './spotify-history-db';
 
 // Spotify's "Extended streaming history" export (requested from
 // https://support.spotify.com/us/article/understanding-your-data/) ships as
@@ -48,21 +57,37 @@ function parseEntries(raw: unknown): PlayRecord[] {
 	return records;
 }
 
-export type ImportResult = { parsed: number; inserted: number; error: string | null };
+export type ImportResult = {
+	parsed: number;
+	inserted: number;
+	replacedScrobbles: number;
+	error: string | null;
+};
 
 export function importExtendedHistoryFile(rawText: string): ImportResult {
 	let json: unknown;
 	try {
 		json = JSON.parse(rawText);
 	} catch {
-		return { parsed: 0, inserted: 0, error: 'Not valid JSON.' };
+		return { parsed: 0, inserted: 0, replacedScrobbles: 0, error: 'Not valid JSON.' };
 	}
 
 	const records = parseEntries(json);
 	if (records.length === 0) {
-		return { parsed: 0, inserted: 0, error: 'No music plays found in this file.' };
+		return { parsed: 0, inserted: 0, replacedScrobbles: 0, error: 'No music plays found in this file.' };
 	}
 
+	// Clear out any live-scrobbled rows (estimated ms_played) this file's date
+	// range now supersedes with real data, before inserting — see
+	// deleteScrobbledRange's docstring for why this has to happen first.
+	let minPlayedAt = records[0].playedAt;
+	let maxPlayedAt = records[0].playedAt;
+	for (const r of records) {
+		if (r.playedAt < minPlayedAt) minPlayedAt = r.playedAt;
+		if (r.playedAt > maxPlayedAt) maxPlayedAt = r.playedAt;
+	}
+	const replacedScrobbles = deleteScrobbledRange(minPlayedAt, maxPlayedAt);
+
 	const { inserted } = insertPlays(records);
-	return { parsed: records.length, inserted, error: null };
+	return { parsed: records.length, inserted, replacedScrobbles, error: null };
 }

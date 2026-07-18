@@ -6,6 +6,41 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	let selectedTag = $state<string | null>(null);
+	let query = $state('');
+
+	const tagCounts = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const project of data.projects) {
+			for (const tag of project.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+		}
+		return counts;
+	});
+	const tags = $derived([...tagCounts.keys()].sort());
+
+	const latestDate = $derived(
+		data.projects.reduce<string | null>((max, p) => (!max || p.date > max ? p.date : max), null)
+	);
+
+	function formatDate(iso: string): string {
+		return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	}
+
+	const filtered = $derived.by(() => {
+		const tag = selectedTag;
+		const q = query.trim().toLowerCase();
+		return data.projects.filter((p) => {
+			const matchesTag = !tag || p.tags.includes(tag);
+			const matchesQuery =
+				!q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+			return matchesTag && matchesQuery;
+		});
+	});
+
+	function toggleTag(tag: string) {
+		selectedTag = selectedTag === tag ? null : tag;
+	}
 </script>
 
 <Seo title="Projects — RazerGhost" description="Things I've built." path="/projects" />
@@ -22,13 +57,62 @@
 	</div>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Things I've built, in progress or otherwise.</p>
 
-	<div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" use:reveal>
-		{#each data.projects as project, i}
+	<div class="mt-6 grid grid-cols-3 gap-4 rounded-lg border border-border p-4 text-center" data-hero-reveal="2">
+		<div>
+			<p class="text-xl font-bold text-white">{data.projects.length}</p>
+			<p class="mt-0.5 text-xs text-dim">Projects</p>
+		</div>
+		<div>
+			<p class="text-xl font-bold text-white">{tags.length}</p>
+			<p class="mt-0.5 text-xs text-dim">Tags</p>
+		</div>
+		<div>
+			<p class="text-xl font-bold text-white">{latestDate ? formatDate(latestDate) : '—'}</p>
+			<p class="mt-0.5 text-xs text-dim">Latest build</p>
+		</div>
+	</div>
+
+	<input
+		type="search"
+		bind:value={query}
+		placeholder="Search projects…"
+		class="mt-6 w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
+	/>
+
+	{#if tags.length}
+		<ul class="mt-6 flex flex-wrap gap-2">
+			<li>
+				<button
+					class="chip rounded-full border px-3 py-1 text-xs {selectedTag === null
+						? 'border-primary text-primary'
+						: 'border-border text-gray'}"
+					onclick={() => (selectedTag = null)}
+				>
+					All <span class="text-dim">{data.projects.length}</span>
+				</button>
+			</li>
+			{#each tags as tag}
+				<li>
+					<button
+						class="chip rounded-full border px-3 py-1 text-xs {selectedTag === tag
+							? 'border-primary text-primary'
+							: 'border-border text-gray'}"
+						onclick={() => toggleTag(tag)}
+					>
+						{tag} <span class="text-dim">{tagCounts.get(tag)}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" use:reveal>
+		{#each filtered as project, i}
 			<div style="transition-delay: {i * 60}ms">
 				<ProjectCard {project} />
 			</div>
 		{:else}
-			<p class="text-sm text-dim">Nothing here yet.</p>
+			<p class="text-sm text-dim">Nothing matches your search.</p>
 		{/each}
 	</div>
 

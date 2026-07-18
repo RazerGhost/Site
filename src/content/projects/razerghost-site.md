@@ -39,8 +39,8 @@ than breaking the page.
 
 - [Devlog](/devlog) — build logs, before/afters, TILs, whatever's worth
   writing down
-- [Status](/status) — what I'm currently up to, plus live Discord/GitHub
-  signal
+- The homepage itself carries what I'm currently up to, plus live
+  Discord/GitHub signal — no separate status page needed
 - [Gear](/gear) — the hardware and software I actually use
 - This projects page — the same content model as the devlog, for things
   worth a proper writeup instead of just a card

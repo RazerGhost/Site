@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { __setDbForTests } from './spotify-history-db';
-import { importExtendedHistoryFile } from './spotify-history';
+import { __setDbForTests, insertPlays } from './spotify-history-db';
+import { importExtendedHistoryFile, getListeningStats } from './spotify-history';
 
 beforeEach(() => {
 	const db = new Database(':memory:');
@@ -96,5 +96,39 @@ describe('importExtendedHistoryFile', () => {
 		const second = importExtendedHistoryFile(json);
 		expect(first.inserted).toBe(1);
 		expect(second.inserted).toBe(0);
+	});
+
+	it('replaces overlapping live-scrobbled rows with the real export data', () => {
+		insertPlays([
+			{
+				playedAt: '2025-06-01T12:00:00.000Z',
+				msPlayed: 210000, // full track duration, the scrobbler's estimate
+				track: 'Song A',
+				artist: 'Artist A',
+				album: null,
+				spotifyUri: 'spotify:track:abc',
+				platform: 'live-scrobble',
+				shuffle: null,
+				skipped: null
+			}
+		]);
+
+		const json = JSON.stringify([
+			{
+				ts: '2025-06-01T12:00:00Z',
+				ms_played: 180000, // real ms_played, differs from the estimate
+				master_metadata_track_name: 'Song A',
+				master_metadata_album_artist_name: 'Artist A',
+				spotify_track_uri: 'spotify:track:abc'
+			}
+		]);
+
+		const result = importExtendedHistoryFile(json);
+		expect(result.replacedScrobbles).toBe(1);
+		expect(result.inserted).toBe(1);
+
+		const stats = getListeningStats();
+		expect(stats.totalPlays).toBe(1);
+		expect(stats.totalMsPlayed).toBe(180000);
 	});
 });

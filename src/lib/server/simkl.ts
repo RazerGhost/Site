@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { getCachedDetails, upsertDetail, cacheKey, getLibrarySnapshot, saveLibrarySnapshot } from './simkl-cache';
 
-const APP_NAME = 'razerghost-site';
+const APP_NAME = 'ghostbase';
 const APP_VERSION = '1.0';
 
 export type LibraryItem = {
@@ -157,6 +157,33 @@ async function fetchDetail(
 		overview: typeof data.overview === 'string' ? data.overview : '',
 		runtime: typeof data.runtime === 'number' ? data.runtime : null
 	};
+}
+
+// Re-fetches and re-caches a single title on demand — used by the private
+// cache inspector page's "force refresh" action, bypassing the normal
+// 60-day staleness window.
+export async function refreshCachedDetail(simklId: number, type: SimklType): Promise<boolean> {
+	const detail = await fetchDetail(simklId, type);
+	if (!detail) return false;
+	upsertDetail(simklId, type, detail.genres, detail.overview, detail.runtime);
+	return true;
+}
+
+// Title lookup keyed the same way as the cache, sourced from the last saved
+// library snapshot — the simkl_details cache itself has no title column.
+export function getLibraryTitleMap(): Map<string, string> {
+	const snapshot = getLibrarySnapshot<Library>();
+	const map = new Map<string, string>();
+	if (!snapshot) return map;
+	const all = [
+		...snapshot.data.watching,
+		...snapshot.data.completed,
+		...snapshot.data.planToWatch,
+		...snapshot.data.onHold,
+		...snapshot.data.dropped
+	];
+	for (const item of all) map.set(cacheKey(item.simklId, item.mediaType), item.title);
+	return map;
 }
 
 export async function enrichLibrary(library: Library): Promise<Library> {

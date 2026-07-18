@@ -1,13 +1,39 @@
 <script lang="ts">
 	import { site } from '$lib/config';
+	import Monitor from '@lucide/svelte/icons/monitor';
+	import Smartphone from '@lucide/svelte/icons/smartphone';
+	import Globe from '@lucide/svelte/icons/globe';
+
+	let { compact = false }: { compact?: boolean } = $props();
+
+	interface LanyardActivity {
+		name: string;
+		type: number;
+		state?: string;
+		details?: string;
+		application_id?: string;
+		emoji?: { name: string; id?: string };
+		timestamps?: { start?: number; end?: number };
+		assets?: {
+			large_image?: string;
+			large_text?: string;
+			small_image?: string;
+			small_text?: string;
+		};
+	}
 
 	interface LanyardData {
 		discord_status: 'online' | 'idle' | 'dnd' | 'offline';
-		activities: { name: string; type: number }[];
+		discord_user: { id: string; username: string; global_name: string | null; avatar: string | null };
+		activities: LanyardActivity[];
+		active_on_discord_desktop: boolean;
+		active_on_discord_mobile: boolean;
+		active_on_discord_web: boolean;
 	}
 
 	let status = $state<'loading' | 'ready' | 'error'>('loading');
 	let data = $state<LanyardData | null>(null);
+	let now = $state(Date.now());
 
 	const statusColor: Record<LanyardData['discord_status'], string> = {
 		online: 'bg-primary',
@@ -39,27 +65,133 @@
 	$effect(() => {
 		poll();
 		const interval = setInterval(poll, 30_000);
-		return () => clearInterval(interval);
+		const tick = setInterval(() => (now = Date.now()), 1000);
+		return () => {
+			clearInterval(interval);
+			clearInterval(tick);
+		};
 	});
 
-	const activityName = $derived(
-		data?.activities.find((a) => a.type !== 4)?.name // type 4 = custom status text, skip for the headline
+	// type 4 = custom status text, kept separate from the "headline" activity.
+	// Spotify (type 2) is skipped for the headline too — it's already shown by
+	// the site's own SpotifyWidget, so surfacing it again here is redundant.
+	const customStatus = $derived(data?.activities.find((a) => a.type === 4));
+	const activity = $derived(data?.activities.find((a) => a.type !== 4 && a.name !== 'Spotify'));
+
+	function assetUrl(image: string | undefined, applicationId: string | undefined): string | null {
+		if (!image) return null;
+		if (image.startsWith('mp:')) return `https://media.discordapp.net/${image.slice(3)}`;
+		if (image.startsWith('spotify:')) return `https://i.scdn.co/image/${image.slice('spotify:'.length)}`;
+		if (!applicationId) return null;
+		return `https://cdn.discordapp.com/app-assets/${applicationId}/${image}.png`;
+	}
+
+	const activityImage = $derived(
+		activity ? assetUrl(activity.assets?.large_image, activity.application_id) : null
 	);
+
+	const avatarUrl = $derived(
+		data?.discord_user.avatar
+			? `https://cdn.discordapp.com/avatars/${data.discord_user.id}/${data.discord_user.avatar}.png?size=64`
+			: null
+	);
+
+	function formatElapsed(startMs: number): string {
+		const totalSec = Math.max(0, Math.floor((now - startMs) / 1000));
+		const h = Math.floor(totalSec / 3600);
+		const m = Math.floor((totalSec % 3600) / 60);
+		const s = totalSec % 60;
+		if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} elapsed`;
+		return `${m}:${s.toString().padStart(2, '0')} elapsed`;
+	}
 </script>
 
-{#if status === 'loading'}
+{#if compact}
+	{#if status === 'loading'}
+		<p class="text-xs text-dim">Checking Discord…</p>
+	{:else if status === 'error' || !data}
+		<p class="text-xs text-dim">Discord unavailable.</p>
+	{:else}
+		<div class="flex items-center gap-1.5 text-xs text-dim">
+			<span class={`h-2 w-2 rounded-full ${statusColor[data.discord_status]}`} aria-hidden="true"
+			></span>
+			<span>{statusLabel[data.discord_status]}</span>
+			{#if customStatus?.state || customStatus?.emoji?.name}
+				<span aria-hidden="true">·</span>
+				<span class="truncate">
+					{#if customStatus.emoji?.name && !customStatus.emoji.id}{customStatus.emoji
+							.name}{' '}{/if}{customStatus.state ?? ''}
+				</span>
+			{/if}
+		</div>
+	{/if}
+{:else if status === 'loading'}
 	<p class="text-sm text-dim">Checking Discord status…</p>
 {:else if status === 'error' || !data}
 	<p class="text-sm text-dim">Discord status unavailable.</p>
 {:else}
-	<div class="flex items-center gap-2 text-sm">
-		<span class={`h-2 w-2 rounded-full ${statusColor[data.discord_status]}`} aria-hidden="true"
-		></span>
-		<span class="text-gray">
-			{statusLabel[data.discord_status]}
-			{#if activityName}
-				<span class="text-dim">— {activityName}</span>
+	<div class="flex items-start gap-3">
+		<div class="relative shrink-0">
+			{#if avatarUrl}
+				<img src={avatarUrl} alt="" class="h-10 w-10 rounded-full object-cover" />
+			{:else}
+				<span class="grid h-10 w-10 place-items-center rounded-full bg-surface-2 text-xs text-dim">
+					{(data.discord_user.global_name ?? data.discord_user.username).slice(0, 1).toUpperCase()}
+				</span>
 			{/if}
-		</span>
+			<span
+				class={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full ring-2 ring-surface ${statusColor[data.discord_status]}`}
+				aria-hidden="true"
+			></span>
+		</div>
+
+		<div class="min-w-0 flex-1 text-sm">
+			<div class="flex items-center gap-2">
+				<span class="font-medium text-white">
+					{data.discord_user.global_name ?? data.discord_user.username}
+				</span>
+				<span class="text-xs text-dim">{statusLabel[data.discord_status]}</span>
+				{#if data.active_on_discord_desktop || data.active_on_discord_mobile || data.active_on_discord_web}
+					<span class="flex items-center gap-1 text-dim">
+						{#if data.active_on_discord_desktop}
+							<Monitor size={12} aria-label="Active on desktop" />
+						{/if}
+						{#if data.active_on_discord_mobile}
+							<Smartphone size={12} aria-label="Active on mobile" />
+						{/if}
+						{#if data.active_on_discord_web}
+							<Globe size={12} aria-label="Active on web" />
+						{/if}
+					</span>
+				{/if}
+			</div>
+
+			{#if customStatus?.state || customStatus?.emoji?.name}
+				<p class="mt-0.5 truncate text-dim">
+					{#if customStatus.emoji?.name && !customStatus.emoji.id}{customStatus.emoji.name}{' '}{/if}
+					{customStatus.state ?? ''}
+				</p>
+			{/if}
+
+			{#if activity}
+				<div class="mt-2 flex items-center gap-2 rounded-md border border-border bg-surface-2/50 px-2 py-1.5">
+					{#if activityImage}
+						<img src={activityImage} alt="" class="h-8 w-8 shrink-0 rounded-md object-cover" />
+					{/if}
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-gray">{activity.name}</p>
+						{#if activity.details}
+							<p class="truncate text-xs text-dim">{activity.details}</p>
+						{/if}
+						{#if activity.state}
+							<p class="truncate text-xs text-dim">{activity.state}</p>
+						{/if}
+						{#if activity.timestamps?.start}
+							<p class="text-xs text-dim">{formatElapsed(activity.timestamps.start)}</p>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
 	</div>
 {/if}

@@ -116,8 +116,7 @@ export const gearGroups = [
 export const navLinks = [
   { label: "Projects", href: "/projects" },
   { label: "Devlog", href: "/devlog" },
-  { label: "Status", href: "/status" },
   { label: "Gear", href: "/gear" },
   { label: "Watchlist", href: "/watchlist" },
-  { label: "Listening", href: "/listening" },
+  { label: "Listens", href: "/listens" },
 ];

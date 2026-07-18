@@ -96,6 +96,24 @@ export function upsertDetail(
 		.run(simklId, mediaType, JSON.stringify(genres), overview, runtime, new Date().toISOString());
 }
 
+// All cached per-title rows, newest-fetched first — powers a private cache
+// inspector page rather than any public-facing feature.
+export function listAllDetails(): (CachedDetail & { simklId: number; mediaType: string })[] {
+	const rows = getDb()
+		.prepare(
+			'SELECT simkl_id, media_type, genres, overview, runtime, fetched_at FROM simkl_details ORDER BY fetched_at DESC'
+		)
+		.all() as { simkl_id: number; media_type: string; genres: string; overview: string; runtime: number | null; fetched_at: string }[];
+	return rows.map((row) => ({
+		simklId: row.simkl_id,
+		mediaType: row.media_type,
+		genres: JSON.parse(row.genres),
+		overview: row.overview,
+		runtime: row.runtime,
+		fetchedAt: row.fetched_at
+	}));
+}
+
 // Single-row full-library snapshot — kept separate from simkl_details (which
 // only caches per-title genres/overview/runtime, not the watchlist itself).
 // Used as a fallback when Simkl's sync endpoint is unreachable; deliberately
