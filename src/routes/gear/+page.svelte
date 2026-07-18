@@ -25,11 +25,11 @@
 
 <Seo title="Gear — RazerGhost" description="Tools and gear in regular rotation." path="/gear" />
 
-<main class="mx-auto max-w-2xl px-6 py-16">
+<main class="mx-auto max-w-6xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white" data-hero-reveal="0">Gear</h1>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Tools and gear in regular rotation.</p>
 
-	<div class="mt-10 grid gap-8">
+	<div class="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
 		{#each gearGroups as group, i}
 			{@const Icon = icons[group.icon]}
 			<section use:reveal style="transition-delay: {i * 60}ms">

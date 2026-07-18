@@ -1,6 +1,5 @@
 <script lang="ts">
 	import DevlogCard from '$lib/components/DevlogCard.svelte';
-	import GithubActivity from '$lib/components/GithubActivity.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import GithubIcon from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import LinkedinIcon from '$lib/components/icons/LinkedinIcon.svelte';
@@ -59,13 +58,6 @@
 			{:else}
 				<p class="text-sm text-dim">No devlog entries yet.</p>
 			{/each}
-		</div>
-	</section>
-
-	<section class="mt-20" use:reveal>
-		<h2 class="text-xl font-bold text-white">Recently on GitHub</h2>
-		<div class="mt-6">
-			<GithubActivity />
 		</div>
 	</section>
 

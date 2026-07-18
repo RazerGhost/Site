@@ -10,7 +10,7 @@
 
 <Seo title="Projects — RazerGhost" description="Things I've built." path="/projects" />
 
-<main class="mx-auto max-w-2xl px-6 py-16">
+<main class="mx-auto max-w-6xl px-6 py-16">
 	<div class="flex items-baseline justify-between" data-hero-reveal="0">
 		<h1 class="text-3xl font-extrabold tracking-tight text-white">Projects</h1>
 		<a
@@ -22,7 +22,7 @@
 	</div>
 	<p class="mt-2 text-gray" data-hero-reveal="1">Things I've built, in progress or otherwise.</p>
 
-	<div class="mt-10 grid gap-4" use:reveal>
+	<div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" use:reveal>
 		{#each data.projects as project, i}
 			<div style="transition-delay: {i * 60}ms">
 				<ProjectCard {project} />

@@ -24,7 +24,7 @@
 <svelte:window onkeydown={mobileMenuOpen ? onKeydown : undefined} />
 
 <header class="sticky top-0 z-10 border-b border-border bg-bg/80 backdrop-blur-md">
-	<nav class="mx-auto flex h-[72px] max-w-2xl items-center justify-between px-6">
+	<nav class="mx-auto flex h-[72px] max-w-6xl items-center justify-between px-6">
 		<a href="/" class="flex items-center gap-2 transition-opacity hover:opacity-85" onclick={closeMenu}>
 			<Logo variant="outline" size={22} />
 			<span class="text-sm font-bold tracking-tight text-white">RazerGhost</span>
