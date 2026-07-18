@@ -1,7 +1,7 @@
 ---
 name: RazerGhost
 description: A personal link hub and devlog — the site you're looking at right now.
-href: https://github.com/RazerGhost/Site
+href: https://github.com/RazerGhost/ghostbase
 live: https://razerghost.xyz
 tags: [sveltekit, tailwind, self-hosted]
 date: 2026-07-16
