@@ -49,6 +49,7 @@
 				<a
 					href={data.project.live}
 					target="_blank"
+					rel="noopener noreferrer"
 					class="link flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 				>
 					Live site <ArrowUpRight size={14} aria-hidden="true" />
@@ -58,6 +59,7 @@
 				<a
 					href={data.project.href}
 					target="_blank"
+					rel="noopener noreferrer"
 					class="link flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 				>
 					<GithubIcon size={14} aria-hidden="true" /> Source
