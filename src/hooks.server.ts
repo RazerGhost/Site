@@ -1,5 +1,8 @@
 import type { Handle } from '@sveltejs/kit';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '$lib/server/session';
+import { startSimklRefreshLoop } from '$lib/server/simkl-refresh';
+
+startSimklRefreshLoop();
 
 export const handle: Handle = ({ event, resolve }) => {
 	const session = verifySessionToken(event.cookies.get(SESSION_COOKIE_NAME));

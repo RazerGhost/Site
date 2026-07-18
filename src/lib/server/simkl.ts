@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/private';
-import { getCachedDetails, upsertDetail, cacheKey } from './simkl-cache';
+import { getCachedDetails, upsertDetail, cacheKey, getLibrarySnapshot, saveLibrarySnapshot } from './simkl-cache';
 
 const APP_NAME = 'razerghost-site';
 const APP_VERSION = '1.0';
@@ -23,6 +23,8 @@ export type LibraryItem = {
 	// to fetch this particular title yet, see enrichLibrary's comment).
 	genres: string[];
 	overview: string | null;
+	// Minutes per episode (or per movie) — same enrichment path/cache as genres.
+	runtime: number | null;
 };
 
 export type Library = {
@@ -103,7 +105,8 @@ async function fetchAll(type: SimklType): Promise<{ status: string; item: Librar
 				simklId: media.ids.simkl,
 				mediaType: type,
 				genres: [],
-				overview: null
+				overview: null,
+				runtime: null
 			}
 		};
 	});
@@ -138,7 +141,10 @@ export async function getLibrary(): Promise<Library> {
 const DETAIL_BATCH_SIZE = 15;
 const STALE_AFTER_MS = 60 * 24 * 60 * 60 * 1000; // 60 days — genres/overview rarely change
 
-async function fetchDetail(simklId: number, type: SimklType): Promise<{ genres: string[]; overview: string } | null> {
+async function fetchDetail(
+	simklId: number,
+	type: SimklType
+): Promise<{ genres: string[]; overview: string; runtime: number | null } | null> {
 	const params = new URLSearchParams({ client_id: env.SIMKL_CLIENT_ID ?? '', extended: 'full' });
 	const res = await fetch(`https://api.simkl.com/${SIMKL_PATH[type]}/${simklId}?${params}`, {
 		headers: { 'User-Agent': `${APP_NAME}/${APP_VERSION}` }
@@ -148,7 +154,8 @@ async function fetchDetail(simklId: number, type: SimklType): Promise<{ genres: 
 	const data = await res.json();
 	return {
 		genres: Array.isArray(data.genres) ? data.genres : [],
-		overview: typeof data.overview === 'string' ? data.overview : ''
+		overview: typeof data.overview === 'string' ? data.overview : '',
+		runtime: typeof data.runtime === 'number' ? data.runtime : null
 	};
 }
 
@@ -162,7 +169,9 @@ export async function enrichLibrary(library: Library): Promise<Library> {
 
 	const stale = buckets.filter((item) => {
 		const hit = cached.get(cacheKey(item.simklId, item.mediaType));
-		return !hit || now - new Date(hit.fetchedAt).getTime() > STALE_AFTER_MS;
+		// Also refetch entries cached before `runtime` was added — otherwise
+		// they'd wait out the full 60-day staleness window before backfilling.
+		return !hit || hit.runtime == null || now - new Date(hit.fetchedAt).getTime() > STALE_AFTER_MS;
 	});
 
 	const toFetch = stale.slice(0, DETAIL_BATCH_SIZE);
@@ -171,7 +180,7 @@ export async function enrichLibrary(library: Library): Promise<Library> {
 	await Promise.allSettled(
 		toFetch.map(async (item) => {
 			const detail = await fetchDetail(item.simklId, item.mediaType);
-			if (detail) upsertDetail(item.simklId, item.mediaType, detail.genres, detail.overview);
+			if (detail) upsertDetail(item.simklId, item.mediaType, detail.genres, detail.overview, detail.runtime);
 		})
 	);
 
@@ -179,7 +188,7 @@ export async function enrichLibrary(library: Library): Promise<Library> {
 	const applyDetails = (items: LibraryItem[]): LibraryItem[] =>
 		items.map((item) => {
 			const hit = merged.get(cacheKey(item.simklId, item.mediaType));
-			return hit ? { ...item, genres: hit.genres, overview: hit.overview || null } : item;
+			return hit ? { ...item, genres: hit.genres, overview: hit.overview || null, runtime: hit.runtime } : item;
 		});
 
 	return {
@@ -189,4 +198,31 @@ export async function enrichLibrary(library: Library): Promise<Library> {
 		onHold: applyDetails(library.onHold),
 		dropped: applyDetails(library.dropped)
 	};
+}
+
+// Fetches + enriches the live library, then persists it as a fallback
+// snapshot — see getLibraryWithFallback below. Also called on a timer (see
+// simkl-refresh.ts) to keep the snapshot warm independent of page traffic.
+export async function refreshLibrarySnapshot(): Promise<Library> {
+	const library = await enrichLibrary(await getLibrary());
+	saveLibrarySnapshot(library);
+	return library;
+}
+
+export type LibraryResult = { library: Library; stale: boolean; staleSince: string | null };
+
+// Simkl's rules explicitly encourage local caching of user data
+// (https://api.simkl.org/api-rules), so a full-library snapshot is kept in
+// SQLite and served here whenever the live sync-all-items call fails —
+// better than an empty page during a Simkl outage. Rethrows if there's no
+// snapshot yet (e.g. first run before anything's ever succeeded).
+export async function getLibraryWithFallback(): Promise<LibraryResult> {
+	try {
+		const library = await refreshLibrarySnapshot();
+		return { library, stale: false, staleSince: null };
+	} catch (err) {
+		const snapshot = getLibrarySnapshot<Library>();
+		if (snapshot) return { library: snapshot.data, stale: true, staleSince: snapshot.fetchedAt };
+		throw err;
+	}
 }

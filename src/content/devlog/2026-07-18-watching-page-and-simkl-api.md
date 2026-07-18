@@ -1,11 +1,11 @@
 ---
 title: The whole Watching page, rebuilt in a day
 date: 2026-07-18
-tags: [watching, simkl]
+tags: [watching, watchlist, simkl]
 excerpt: Stats, search, genre filters, a caching layer, ratings, a shuffle button, a whole second tab for anime — every bit of it shipped in one sitting.
 ---
 
-None of this was a roadmap. The [Watching page](/watching) opened this
+None of this was a roadmap. The [Watching page](/watchlist) opened this
 morning as three static grids off one API call. By tonight it had a search
 box, a sort control, genre filtering, hover synopses backed by their own
 SQLite cache, rating badges, progress bars, a shuffle button, and an entire
@@ -48,4 +48,31 @@ and **Anime** — each with its own stats, its own filters, its own everything.
 That could've been a whole separate afternoon. It was maybe twenty minutes.
 
 Started the day with a page that did almost nothing. Ended it with a page
-that has its own database file. [Go see for yourself](/watching).
+that has its own database file.
+
+## Update: it outgrew "Watching"
+
+It wasn't just tracking what I was currently watching — completed titles
+and the plan-to-watch backlog were sitting right there too, so the name
+stopped fitting. The page is now **Watchlist** at
+[`/watchlist`](/watchlist); the old `/watching` URL redirects there so
+nothing that already linked to it breaks.
+
+The layout got wider at the same time. It used to share the same narrow,
+centered column as every other page on the site, which made no sense once
+the grid had six columns of posters trying to fit in it. Watchlist is the
+one page that breaks out of that — search, sort, and the stats now use the
+full width too, instead of trailing off into empty space on the right.
+
+The stats strip grew up. Completed count, episodes watched, and completed
+this year are still there, but now sit next to actual watch time — days,
+hours, minutes — computed from real per-title runtimes pulled from Simkl's
+API and cached alongside genres. Peak year, most active weekday, average
+rating, backlog size with hours to clear, completion rate, and a top-5
+genre breakdown round it out. Closer to what Simkl's own stats page shows
+than the three numbers it started with.
+
+**Surprise me** stopped being a one-line text pick that popped a new tab.
+It now reveals a full spotlight card in place — poster, rating, genres,
+overview, an "Open on Simkl" link, and a "Try another" button to reroll
+without leaving the page. [Go see for yourself](/watchlist).

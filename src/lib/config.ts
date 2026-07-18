@@ -30,6 +30,26 @@ export const socialLinks = [
   },
 ];
 
+// Trackers linked from the Watchlist page rather than the site-wide social
+// links, since they're only relevant in that context.
+export const watchProfiles = [
+  {
+    label: "Simkl",
+    href: "https://simkl.com/8788331/",
+    icon: "simkl" as const,
+  },
+  {
+    label: "MyDramaList",
+    href: "https://mydramalist.com/profile/RazerGhost",
+    icon: "mydramalist" as const,
+  },
+  {
+    label: "MyAnimeList",
+    href: "https://myanimelist.net/profile/RazerGhost",
+    icon: "myanimelist" as const,
+  },
+];
+
 export const gearGroups = [
   {
     label: "Editor",
@@ -98,5 +118,5 @@ export const navLinks = [
   { label: "Devlog", href: "/devlog" },
   { label: "Status", href: "/status" },
   { label: "Gear", href: "/gear" },
-  { label: "Watching", href: "/watching" },
+  { label: "Watchlist", href: "/watchlist" },
 ];
