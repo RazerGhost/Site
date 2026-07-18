@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { marked } from 'marked';
+	import { richMarked, markTaskListItems } from '$lib/markdown';
 	import { browser } from '$app/environment';
 	import Seo from '$lib/components/Seo.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import CircleHelp from '@lucide/svelte/icons/circle-help';
+	import { tooltip } from '$lib/actions/tooltip';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -257,7 +259,12 @@
 		}
 		const result: Cluster[] = [];
 		for (const ids of groups.values()) {
-			if (ids.length < 2) continue;
+			// A 2-note cluster is just "one link" — its auto-name (both titles
+			// joined) only restates what's already visible in the two node
+			// circles, and it competes for the same space as the link's own
+			// label. Cluster labels start earning their keep at 3+ notes,
+			// where they summarize a neighborhood you can't read at a glance.
+			if (ids.length < 3) continue;
 			let sx = 0,
 				sy = 0;
 			for (const id of ids) {
@@ -325,6 +332,7 @@
 	let panelTags = $state('');
 	let panelFolder = $state('');
 	let panelMode = $state<'write' | 'preview' | 'history'>('write');
+	let panelView = $state<'view' | 'edit'>('view');
 	let panelDirty = $state(false);
 	let panelError = $state('');
 	let panelSaving = $state(false);
@@ -362,7 +370,9 @@
 	}
 
 	const previewHtml = $derived(
-		makeChecklistInteractive(marked.parse(resolveWikiLinks(panelBody), { async: false }) as string)
+		makeChecklistInteractive(
+			markTaskListItems(richMarked.parse(resolveWikiLinks(panelBody), { async: false }) as string)
+		)
 	);
 
 	function onPreviewClick(e: MouseEvent) {
@@ -434,6 +444,7 @@
 		selectedId = id;
 		panelError = '';
 		panelMode = 'write';
+		panelView = 'view';
 		loadingNote = true;
 		const res = await fetch(`/api/notes/${id}`);
 		loadingNote = false;
@@ -454,6 +465,7 @@
 	function closePanel() {
 		selectedId = null;
 		panelDirty = false;
+		panelView = 'view';
 	}
 
 	async function savePanel() {
@@ -1015,6 +1027,13 @@
 	});
 
 	// ── Command palette ──────────────────────────────────────────────
+	const TOOL_LINKS = [
+		{ label: 'Devlog', href: '/notes/devlog' },
+		{ label: 'Projects', href: '/notes/projects' },
+		{ label: 'Status', href: '/notes/status' },
+		{ label: 'Spotify import', href: '/spotify-import' },
+		{ label: 'Watchlist cache', href: '/notes/watchlist-cache' }
+	];
 	let paletteOpen = $state(false);
 	let paletteQuery = $state('');
 	let paletteInputEl: HTMLInputElement | undefined = $state();
@@ -1030,6 +1049,13 @@
 		focusNode(id);
 		closePalette();
 	}
+	function paletteCreateNote() {
+		if (!canvasEl) return;
+		const rect = canvasEl.getBoundingClientRect();
+		const w = toWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+		createNoteAt(w.x, w.y);
+		closePalette();
+	}
 
 	$effect(() => {
 		if (!browser) return;
@@ -1042,6 +1068,10 @@
 			if (e.key === 'Escape') {
 				if (paletteOpen) {
 					closePalette();
+					return;
+				}
+				if (selectedId !== null) {
+					closePanel();
 					return;
 				}
 				multiSelected = new Set();
@@ -1176,6 +1206,10 @@
 		).slice(0, 8)
 	);
 
+	const paletteToolMatches = $derived(
+		TOOL_LINKS.filter((t) => t.label.toLowerCase().includes(paletteQuery.trim().toLowerCase()))
+	);
+
 	function focusNode(id: number) {
 		const node = nodeById.get(id);
 		if (!node || !canvasEl) return;
@@ -1201,13 +1235,6 @@
 				RazerGhost
 			</a>
 			<ThemeToggle />
-		</div>
-		<div class="flex flex-wrap gap-x-3 gap-y-1 border-b border-border px-3 py-2 text-[11px]">
-			<a href="/notes/devlog" class="link text-dim hover:text-primary">Devlog</a>
-			<a href="/notes/projects" class="link text-dim hover:text-primary">Projects</a>
-			<a href="/notes/status" class="link text-dim hover:text-primary">Status</a>
-			<a href="/spotify-import" class="link text-dim hover:text-primary">Spotify import</a>
-			<a href="/notes/watchlist-cache" class="link text-dim hover:text-primary">Watchlist cache</a>
 		</div>
 		<div class="border-b border-border p-3">
 			<input
@@ -1348,11 +1375,6 @@
 				Export JSON
 			</button>
 		</div>
-		<div class="border-t border-border p-3 text-xs leading-relaxed text-dim">
-			Use the dock above the canvas to switch modes: Link, Path, or Select. Pointer mode drags
-			notes and pans the canvas. Holding shift/ctrl/alt while dragging works as a shortcut too.
-			Type <code>[[Note Title]]</code> in a body to auto-link it.
-		</div>
 	</aside>
 
 	{#if paletteOpen}
@@ -1378,6 +1400,7 @@
 					class="border-b border-border bg-transparent px-4 py-3 text-white placeholder:text-dim focus:outline-none"
 				/>
 				<ul class="max-h-80 overflow-y-auto p-2">
+					<li class="px-3 pt-1 pb-1 text-[11px] uppercase tracking-wide text-dim">Notes</li>
 					{#each paletteMatches as note (note.id)}
 						<li>
 							<button
@@ -1389,30 +1412,33 @@
 							</button>
 						</li>
 					{:else}
-						<li class="px-3 py-4 text-xs text-dim">No matches.</li>
+						<li class="px-3 py-2 text-xs text-dim">No matches.</li>
 					{/each}
+
+					{#if paletteToolMatches.length > 0}
+						<li class="mt-2 border-t border-border px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-dim">
+							Tools
+						</li>
+						{#each paletteToolMatches as tool (tool.href)}
+							<li>
+								<a
+									href={tool.href}
+									onclick={closePalette}
+									class="link block w-full truncate rounded-md px-3 py-2 text-left text-sm text-gray hover:bg-surface-2 hover:text-white"
+								>
+									{tool.label}
+								</a>
+							</li>
+						{/each}
+					{/if}
+
 					<li class="mt-1 border-t border-border pt-1">
 						<button
 							type="button"
-							onclick={() => {
-								openNewNoteAtCenter();
-								closePalette();
-							}}
+							onclick={paletteCreateNote}
 							class="w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-surface-2"
 						>
 							+ New note
-						</button>
-					</li>
-					<li>
-						<button
-							type="button"
-							onclick={() => {
-								fitToView();
-								closePalette();
-							}}
-							class="w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-surface-2"
-						>
-							Fit view
 						</button>
 					</li>
 				</ul>
@@ -1434,44 +1460,6 @@
 		ondblclick={onCanvasDblClick}
 		onwheel={onWheel}
 	>
-		<!-- Control dock: replaces the old modifier-key combos with explicit modes -->
-		<div
-			class="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1 rounded-full border border-border bg-surface/90 p-1"
-		>
-			{#each TOOLS as t (t.id)}
-				<button
-					type="button"
-					title={t.hint}
-					onclick={() => (tool = tool === t.id ? 'default' : t.id)}
-					class="pointer-events-auto rounded-full px-3 py-1 text-xs font-medium transition-colors {tool ===
-					t.id
-						? 'bg-primary/20 text-primary'
-						: 'text-dim hover:text-white'}"
-				>
-					{t.label}
-				</button>
-			{/each}
-			<span class="mx-1 h-4 w-px bg-border"></span>
-			<button
-				type="button"
-				title="Add a note at the center of the view"
-				onclick={openNewNoteAtCenter}
-				class="pointer-events-auto rounded-full px-3 py-1 text-xs font-medium text-dim hover:text-white"
-			>
-				+ Note
-			</button>
-		</div>
-
-		<div class="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
-			<button
-				type="button"
-				onclick={fitToView}
-				class="pointer-events-auto rounded-full border border-border bg-surface/80 px-3 py-1 text-xs text-gray hover:border-primary hover:text-primary"
-			>
-				Fit view
-			</button>
-		</div>
-
 		{#if multiSelected.size > 0}
 			<div
 				class="pointer-events-auto absolute left-1/2 top-14 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[var(--color-action)] bg-surface/90 px-4 py-1.5 text-xs text-white"
@@ -1565,8 +1553,8 @@
 				<button
 					type="button"
 					onclick={() => renameCluster(cluster)}
-					class="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-border/60 bg-surface/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-dim hover:border-primary hover:text-primary"
-					style="left:{cluster.x}px; top:{cluster.y - radiusFor(cluster.ids[0]) - 18}px;"
+					class="pointer-events-auto absolute whitespace-nowrap rounded-full border border-border/60 bg-surface/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-dim hover:border-primary hover:text-primary"
+					style="left:{cluster.x}px; top:{cluster.y - radiusFor(cluster.ids[0]) - 18}px; transform: translate(-50%, -50%) scale({1 / zoom});"
 				>
 					{clusterLabel(cluster)}
 				</button>
@@ -1637,10 +1625,6 @@
 			></div>
 		{/if}
 
-		<div class="pointer-events-none absolute bottom-3 left-3 text-xs text-dim">
-			{Math.round(zoom * 100)}%
-		</div>
-
 		{#if nodes.length > 0}
 			{@const vp = minimapViewport()}
 			<button
@@ -1665,83 +1649,202 @@
 		{/if}
 	</div>
 
+	<!-- Control dock: sits outside the canvas so it centers on the whole
+	     screen (sidebar + canvas + detail panel) instead of just the
+	     canvas's own — narrower and shifting — width. -->
+	<div
+		class="pointer-events-none fixed bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface/90 p-1"
+	>
+		{#each TOOLS as t (t.id)}
+			<button
+				type="button"
+				use:tooltip={t.hint}
+				onclick={() => (tool = tool === t.id ? 'default' : t.id)}
+				class="pointer-events-auto rounded-full px-3 py-1 text-xs font-medium transition-colors {tool ===
+				t.id
+					? 'bg-primary/20 text-primary'
+					: 'text-dim hover:text-white'}"
+			>
+				{t.label}
+			</button>
+		{/each}
+		<span class="mx-1 h-4 w-px bg-border"></span>
+		<button
+			type="button"
+			use:tooltip={'Add a note at the center of the view'}
+			onclick={openNewNoteAtCenter}
+			class="pointer-events-auto rounded-full px-3 py-1 text-xs font-medium text-dim hover:text-white"
+		>
+			+ Note
+		</button>
+		<span class="mx-1 h-4 w-px bg-border"></span>
+		<span class="px-2 text-xs text-dim">{Math.round(zoom * 100)}%</span>
+		<button
+			type="button"
+			onclick={fitToView}
+			class="pointer-events-auto rounded-full px-3 py-1 text-xs font-medium text-dim hover:text-white"
+		>
+			Fit view
+		</button>
+		<span class="mx-1 h-4 w-px bg-border"></span>
+		<button
+			type="button"
+			use:tooltip={'Use the dock to switch modes: Link, Path, or Select. Pointer mode drags notes and pans the canvas. Holding shift/ctrl/alt while dragging works as a shortcut too. Type [[Note Title]] in a body to auto-link it.'}
+			aria-label="Dock help"
+			class="pointer-events-auto grid h-6 w-6 place-items-center rounded-full text-dim hover:text-white"
+		>
+			<CircleHelp size={14} aria-hidden="true" />
+		</button>
+	</div>
+
 	<!-- Detail panel -->
 	{#if selectedId !== null}
-		<aside class="flex w-96 shrink-0 flex-col border-l border-border bg-surface/40">
-			<div class="flex items-center justify-between border-b border-border p-3">
-				<div class="flex gap-1 text-xs">
-					<button
-						type="button"
-						onclick={() => (panelMode = 'write')}
-						class="rounded-full px-3 py-1 transition-colors {panelMode === 'write'
-							? 'bg-primary/10 text-primary'
-							: 'text-dim hover:text-white'}"
-					>
-						Write
-					</button>
-					<button
-						type="button"
-						onclick={() => (panelMode = 'preview')}
-						class="rounded-full px-3 py-1 transition-colors {panelMode === 'preview'
-							? 'bg-primary/10 text-primary'
-							: 'text-dim hover:text-white'}"
-					>
-						Preview
-					</button>
-					<button
-						type="button"
-						onclick={() => (panelMode = 'history')}
-						class="rounded-full px-3 py-1 transition-colors {panelMode === 'history'
-							? 'bg-primary/10 text-primary'
-							: 'text-dim hover:text-white'}"
-					>
-						History
-					</button>
-				</div>
-				<div class="flex items-center gap-2">
-					{#if panelSaving}
-						<span class="text-[11px] text-dim">Saving…</span>
-					{:else if !panelDirty}
-						<span class="text-[11px] text-dim">Saved</span>
+		<div
+			class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6"
+			onclick={closePanel}
+			role="presentation"
+		>
+			<div
+				onclick={(e) => e.stopPropagation()}
+				role="presentation"
+				class="flex h-[75vh] w-[65vw] max-w-4xl flex-col rounded-lg border border-border bg-surface shadow-2xl"
+			>
+				<div class="flex items-center justify-between border-b border-border p-3">
+					{#if panelView === 'edit'}
+						<div class="flex gap-1 text-xs">
+							<button
+								type="button"
+								onclick={() => (panelMode = 'write')}
+								class="rounded-full px-3 py-1 transition-colors {panelMode === 'write'
+									? 'bg-primary/10 text-primary'
+									: 'text-dim hover:text-white'}"
+							>
+								Write
+							</button>
+							<button
+								type="button"
+								onclick={() => (panelMode = 'preview')}
+								class="rounded-full px-3 py-1 transition-colors {panelMode === 'preview'
+									? 'bg-primary/10 text-primary'
+									: 'text-dim hover:text-white'}"
+							>
+								Preview
+							</button>
+							<button
+								type="button"
+								onclick={() => (panelMode = 'history')}
+								class="rounded-full px-3 py-1 transition-colors {panelMode === 'history'
+									? 'bg-primary/10 text-primary'
+									: 'text-dim hover:text-white'}"
+							>
+								History
+							</button>
+						</div>
+					{:else}
+						<span class="text-[11px] uppercase tracking-wide text-dim">Viewing</span>
 					{/if}
-					<button type="button" onclick={closePanel} class="text-xs text-dim hover:text-white">
-						Close
-					</button>
-				</div>
-			</div>
-
-			<div class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-				{#if loadingNote}
-					<p class="text-sm text-dim">Loading…</p>
-				{:else}
-					{#if panelError}
-						<p class="text-sm text-red-400">{panelError}</p>
-					{/if}
-					<input
-						type="text"
-						bind:value={panelTitle}
-						oninput={() => (panelDirty = true)}
-						placeholder="Title"
-						class="rounded-lg border border-border bg-transparent px-3 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-					/>
-					<div class="flex gap-2">
-						<input
-							type="text"
-							bind:value={panelTags}
-							oninput={() => (panelDirty = true)}
-							placeholder="Tags, comma-separated"
-							class="flex-1 rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
-						/>
-						<input
-							type="text"
-							bind:value={panelFolder}
-							oninput={() => (panelDirty = true)}
-							placeholder="Folder"
-							class="flex-1 rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
-						/>
+					<div class="flex items-center gap-2">
+						{#if panelView === 'edit'}
+							{#if panelSaving}
+								<span class="text-[11px] text-dim">Saving…</span>
+							{:else if !panelDirty}
+								<span class="text-[11px] text-dim">Saved</span>
+							{/if}
+							<button
+								type="button"
+								onclick={() => (panelView = 'view')}
+								class="text-xs text-dim hover:text-white"
+							>
+								Done
+							</button>
+							<span class="h-4 w-px bg-border"></span>
+						{/if}
+						<button type="button" onclick={closePanel} class="text-xs text-dim hover:text-white">
+							Close
+						</button>
 					</div>
+				</div>
 
-					{#if panelMode === 'write'}
+				<div class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+					{#if loadingNote}
+						<p class="text-sm text-dim">Loading…</p>
+					{:else if panelError}
+						<p class="text-sm text-red-400">{panelError}</p>
+					{:else if panelView === 'view'}
+						<h2 class="text-xl font-bold text-white">{panelTitle || 'Untitled'}</h2>
+						{#if panelTags || panelFolder}
+							<div class="flex flex-wrap gap-3 text-xs text-dim">
+								{#if panelFolder}<span>📁 {panelFolder}</span>{/if}
+								{#if panelTags}<span>{panelTags}</span>{/if}
+							</div>
+						{/if}
+						<div
+							role="group"
+							aria-label="Note"
+							onclick={onPreviewClick}
+							class="devlog-content flex-1 overflow-y-auto rounded-lg border border-border px-3 py-2"
+						>
+							{@html previewHtml}
+						</div>
+
+						{#if selectedLinks.length > 0}
+							<div class="border-t border-border pt-3">
+								<p class="mb-2 text-xs uppercase tracking-wide text-dim">Connected</p>
+								<ul class="flex flex-col gap-1">
+									{#each selectedLinks as l (l.linkId)}
+										<li class="flex items-center justify-between gap-2 text-sm">
+											<button
+												type="button"
+												onclick={() => l.other && focusNode(l.other.id)}
+												class="link min-w-0 flex-1 truncate text-left text-gray hover:text-primary"
+											>
+												{l.other?.title || 'Untitled'}
+												{#if l.label}<span class="text-xs text-dim">— {l.label}</span>{/if}
+											</button>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						<div class="flex items-center justify-between border-t border-border pt-3">
+							<button
+								type="button"
+								onclick={() => (panelView = 'edit')}
+								class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+							>
+								Edit
+							</button>
+							<button type="button" onclick={deleteSelected} class="text-xs text-dim hover:text-red-400">
+								Delete note
+							</button>
+						</div>
+					{:else}
+						<input
+							type="text"
+							bind:value={panelTitle}
+							oninput={() => (panelDirty = true)}
+							placeholder="Title"
+							class="rounded-lg border border-border bg-transparent px-3 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+						/>
+						<div class="flex gap-2">
+							<input
+								type="text"
+								bind:value={panelTags}
+								oninput={() => (panelDirty = true)}
+								placeholder="Tags, comma-separated"
+								class="min-w-0 flex-1 rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
+							/>
+							<input
+								type="text"
+								bind:value={panelFolder}
+								oninput={() => (panelDirty = true)}
+								placeholder="Folder"
+								class="min-w-0 flex-1 rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
+							/>
+						</div>
+
+						{#if panelMode === 'write'}
 						<div class="flex flex-wrap items-center gap-1">
 							<button
 								type="button"
@@ -1774,6 +1877,23 @@
 								class="rounded-md border border-border px-2 py-1 text-xs text-dim hover:border-primary hover:text-primary"
 							>
 								☑ Item
+							</button>
+							<button
+								type="button"
+								title="Code block"
+								onclick={() => wrapSelection('```\n', '\n```')}
+								class="rounded-md border border-border px-2 py-1 font-mono text-xs text-dim hover:border-primary hover:text-primary"
+							>
+								{'</>'}
+							</button>
+							<button
+								type="button"
+								title="Table"
+								onclick={() =>
+									insertAtCursor('\n| Column | Column |\n| --- | --- |\n| Cell | Cell |\n')}
+								class="rounded-md border border-border px-2 py-1 text-xs text-dim hover:border-primary hover:text-primary"
+							>
+								Table
 							</button>
 							<label
 								class="link ml-auto w-fit cursor-pointer rounded-full border border-border px-3 py-1 text-xs text-dim hover:border-primary hover:text-primary"
@@ -1875,7 +1995,8 @@
 					</div>
 				{/if}
 			</div>
-		</aside>
+			</div>
+		</div>
 	{/if}
 </main>
 

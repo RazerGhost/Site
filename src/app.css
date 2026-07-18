@@ -133,6 +133,87 @@
 	color: var(--dim);
 }
 
+.devlog-content table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--fs-body-sm);
+}
+.devlog-content th,
+.devlog-content td {
+	border: 1px solid var(--border);
+	padding: var(--space-2) var(--space-3);
+	text-align: left;
+}
+.devlog-content th {
+	color: var(--white);
+	font-weight: var(--fw-semibold);
+	background: var(--surface-2);
+}
+
+/* GFM task-list items — marked emits a plain <li><input type=checkbox> …</li>;
+   markTaskListItems() (src/lib/markdown.ts) tags the <li> so the bullet can
+   drop out and the checkbox can align with the text instead of sitting next
+   to a redundant bullet. */
+.devlog-content li.task-list-item {
+	list-style: none;
+	margin-left: calc(-1 * var(--space-5));
+}
+.devlog-content li.task-list-item input[type='checkbox'] {
+	margin-right: var(--space-2);
+	accent-color: var(--color-primary);
+}
+.devlog-content li.task-list-item:has(input:checked) {
+	color: var(--dim);
+	text-decoration: line-through;
+}
+
+/* Syntax highlighting (highlight.js token classes, see src/lib/markdown.ts) —
+   deliberately reuses the existing accent system rather than a stock hljs
+   theme, so code blocks stay on-brand instead of introducing new colors. */
+.devlog-content .hljs {
+	color: var(--gray);
+}
+.devlog-content .hljs-comment,
+.devlog-content .hljs-quote {
+	color: var(--dim);
+	font-style: italic;
+}
+.devlog-content .hljs-keyword,
+.devlog-content .hljs-selector-tag,
+.devlog-content .hljs-tag,
+.devlog-content .hljs-name,
+.devlog-content .hljs-literal {
+	color: var(--color-primary);
+}
+.devlog-content .hljs-string,
+.devlog-content .hljs-attr,
+.devlog-content .hljs-symbol,
+.devlog-content .hljs-bullet,
+.devlog-content .hljs-addition {
+	color: var(--warn);
+}
+.devlog-content .hljs-title,
+.devlog-content .hljs-section,
+.devlog-content .hljs-built_in,
+.devlog-content .hljs-type {
+	color: var(--white);
+	font-weight: var(--fw-semibold);
+}
+.devlog-content .hljs-number,
+.devlog-content .hljs-meta,
+.devlog-content .hljs-link {
+	color: var(--gray);
+}
+.devlog-content .hljs-deletion {
+	color: var(--danger-text);
+}
+.devlog-content .hljs-emphasis {
+	font-style: italic;
+}
+.devlog-content .hljs-strong {
+	font-weight: var(--fw-bold);
+}
+
 .devlog-content .footnote-ref a,
 .devlog-content .footnote-backref {
 	color: var(--color-primary);

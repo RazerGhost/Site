@@ -21,6 +21,7 @@
 		"@resvg/resvg-js": "^2.6.2",
 		"better-sqlite3": "^12.11.1",
 		"gray-matter": "^4.0.3",
+		"highlight.js": "^11.11.1",
 		"marked": "^15.0.4",
 		"mermaid": "^11.4.1",
 		"satori": "^0.28.0"
