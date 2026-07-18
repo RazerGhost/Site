@@ -5,6 +5,7 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import CircleHelp from '@lucide/svelte/icons/circle-help';
+	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import { tooltip } from '$lib/actions/tooltip';
 	import type { PageProps } from './$types';
 
@@ -1027,13 +1028,6 @@
 	});
 
 	// ── Command palette ──────────────────────────────────────────────
-	const TOOL_LINKS = [
-		{ label: 'Devlog', href: '/notes/devlog' },
-		{ label: 'Projects', href: '/notes/projects' },
-		{ label: 'Status', href: '/notes/status' },
-		{ label: 'Spotify import', href: '/spotify-import' },
-		{ label: 'Watchlist cache', href: '/notes/watchlist-cache' }
-	];
 	let paletteOpen = $state(false);
 	let paletteQuery = $state('');
 	let paletteInputEl: HTMLInputElement | undefined = $state();
@@ -1206,10 +1200,6 @@
 		).slice(0, 8)
 	);
 
-	const paletteToolMatches = $derived(
-		TOOL_LINKS.filter((t) => t.label.toLowerCase().includes(paletteQuery.trim().toLowerCase()))
-	);
-
 	function focusNode(id: number) {
 		const node = nodeById.get(id);
 		if (!node || !canvasEl) return;
@@ -1234,7 +1224,16 @@
 				<Logo variant="outline" size={16} />
 				RazerGhost
 			</a>
-			<ThemeToggle />
+			<div class="flex items-center gap-2">
+				<a
+					href="/admin"
+					class="link flex items-center gap-1 text-dim hover:text-primary"
+					title="Admin tools"
+				>
+					<LayoutGrid size={16} />
+				</a>
+				<ThemeToggle />
+			</div>
 		</div>
 		<div class="border-b border-border p-3">
 			<input
@@ -1415,22 +1414,15 @@
 						<li class="px-3 py-2 text-xs text-dim">No matches.</li>
 					{/each}
 
-					{#if paletteToolMatches.length > 0}
-						<li class="mt-2 border-t border-border px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-dim">
-							Tools
-						</li>
-						{#each paletteToolMatches as tool (tool.href)}
-							<li>
-								<a
-									href={tool.href}
-									onclick={closePalette}
-									class="link block w-full truncate rounded-md px-3 py-2 text-left text-sm text-gray hover:bg-surface-2 hover:text-white"
-								>
-									{tool.label}
-								</a>
-							</li>
-						{/each}
-					{/if}
+					<li class="mt-2 border-t border-border pt-1">
+						<a
+							href="/admin"
+							onclick={closePalette}
+							class="link block w-full rounded-md px-3 py-2 text-left text-sm text-gray hover:bg-surface-2 hover:text-white"
+						>
+							Admin tools →
+						</a>
+					</li>
 
 					<li class="mt-1 border-t border-border pt-1">
 						<button
