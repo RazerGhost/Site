@@ -11,7 +11,7 @@
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit status</h1>
-	<p class="mt-2 text-sm text-dim">Shown on the homepage and <a href="/status" class="link text-primary hover:underline">/status</a>.</p>
+	<p class="mt-2 text-sm text-dim">Shown in the "Right now" card on the <a href="/" class="link text-primary hover:underline">homepage</a>.</p>
 
 	<form method="POST" class="mt-8 flex flex-col gap-4">
 		{#if form?.error}
@@ -49,7 +49,7 @@
 				Save
 			</button>
 			<a
-				href="/status"
+				href="/"
 				target="_blank"
 				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 			>
