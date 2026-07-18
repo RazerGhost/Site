@@ -4,7 +4,7 @@ description: A personal link hub and devlog — the site you're looking at right
 href: https://github.com/RazerGhost/ghostbase
 live: https://razerghost.xyz
 tags: [sveltekit, tailwind, self-hosted]
-date: 2026-07-16
+date: 2026-07-18
 ---
 
 The site you're reading this on. A small, personal corner of the internet —
@@ -35,12 +35,25 @@ pull from external APIs and degrade gracefully — they just quietly disappear
 or show a fallback state if their env vars or accounts aren't set up, rather
 than breaking the page.
 
+There's also a small private editing area behind GitHub login (`/notes`) —
+a notes graph, a status editor for the homepage's "Right now" card, and
+markdown editors for the devlog and this projects page itself, so posts can
+be drafted and previewed against a real dev server before being committed
+and pushed.
+
 ## What's here
 
 - [Devlog](/devlog) — build logs, before/afters, TILs, whatever's worth
   writing down
 - The homepage itself carries what I'm currently up to, plus live
   Discord/GitHub signal — no separate status page needed
-- [Gear](/gear) — the hardware and software I actually use
+- [Gear](/gear) — the hardware and software I actually use, searchable and
+  filterable by category
+- [Watchlist](/watchlist) — what I'm watching, backed by Simkl with a cached
+  fallback so it stays up even if Simkl's API doesn't
+- [Listens](/listens) — full listening history built from Spotify's own data
+  export (not just the last-50 the live API exposes), searchable as an
+  interactive card grid, kept current between exports by a scheduled
+  scrobble poller
 - This projects page — the same content model as the devlog, for things
   worth a proper writeup instead of just a card
