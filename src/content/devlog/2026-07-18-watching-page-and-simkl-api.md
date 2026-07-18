@@ -1,78 +1,75 @@
 ---
-title: The whole Watching page, rebuilt in a day
+title: The whole Watchlist page, built in a day
 date: 2026-07-18
-tags: [watching, watchlist, simkl]
-excerpt: Stats, search, genre filters, a caching layer, ratings, a shuffle button, a whole second tab for anime — every bit of it shipped in one sitting.
+tags: [watchlist, simkl]
+excerpt: Simkl's bulk sync call doesn't carry genres, overviews, or runtimes — getting those without hammering a per-title endpoint on every load meant a small self-warming cache, plus a full-library snapshot to survive an outage.
 ---
 
-None of this was a roadmap. The [Watching page](/watchlist) opened this
-morning as three static grids off one API call. By tonight it had a search
-box, a sort control, genre filtering, hover synopses backed by their own
-SQLite cache, rating badges, progress bars, a shuffle button, and an entire
-second tab for anime. Same page, same day.
+The [Watchlist page](/watchlist) opened as three static grids off one Simkl
+API call. By the end of the day it had search, sorting, genre filters, a
+stats section, and a caching layer underneath all of it — same page, same
+day, just a lot more of it by the time it shipped.
 
-Honest reason it moved that fast: I wasn't typing most of it. Claude Code
-did — the SQLite schema, the batched cache warming, the Docker volume
-plumbing, even catching that the poster links were broken in the first
-place. I called the shots on what the page should actually do; it did the
-part where that turns into working code.
+## The shape of it
 
-<div data-embed="TerminalReplay" data-lines='["$ open /watching","three grids, one api call, nothing to click","$ notice the poster links go nowhere","fixed — simkl needs the numeric id, not just the slug","$ add search + sort + a stats strip","$ want genres and synopses on the cards","turns out the bulk api doesn&apos;t have them","$ build a cache that warms itself, 15 titles at a time","$ add rating badges, progress bars, up-next episodes","$ add a shuffle button for the backlog","$ anime shows up in the library","$ split the page into two tabs","ship it","one day."]'></div>
+`getLibrary()` in `simkl.ts` hits Simkl's `sync/all-items` endpoint once per
+media type (shows, anime, movies) with `status=all`, which returns every
+bucket — watching, completed, plan-to-watch, on hold, dropped — in one call
+per type instead of one call per bucket. Korean dramas and movies mostly live
+under the "shows"/"movies" buckets rather than "anime" on Simkl, but querying
+all three keeps the page correct even for a title filed somewhere unexpected.
 
-## Everything that's actually on the page now
+One thing the bulk response gets wrong on its own: poster links. Simkl's
+detail URLs need the numeric id (`/tv/<id>/<slug>`), not just the slug — a
+slug-only link 404s into the generic discover page instead of the title.
 
-A stats strip up top — completed count, total episodes, completed this
-year. A search box and a sort control. Genre chips you can tap to narrow
-the grid down. Hover a poster and a synopsis fades in over it. Rated titles
-get a star badge; anything with episodes gets a progress bar along the
-bottom of the card. A **Surprise me** button picks something random off the
-backlog — scoped to TV and movies only, so it never hands you an anime pick
-by accident.
+## Genres and overviews aren't in that call
 
-## The part that could've taken a week
+Genres, overview text, and per-episode runtime are a separate, per-title
+request — and the library has around 250 titles. Firing all of them on every
+page load isn't an option, so `enrichLibrary()` only ever tops up a small,
+bounded batch (`DETAIL_BATCH_SIZE = 15`) of missing or stale entries per
+request, caching results in `simkl-cache.db`'s `simkl_details` table keyed by
+`(simkl_id, media_type)`. A library this size fully warms over a handful of
+page loads; anything beyond the batch just renders without genres until its
+turn comes up — the same degrade-gracefully approach as the rest of the site.
+Cached entries go stale after 60 days (genres don't change often), and rows
+cached before `runtime` existed are treated as stale too, so they backfill
+instead of waiting out the full window.
 
-Genres and synopses aren't in the same API call as everything else — that's
-a separate, per-title request, and there are around 250 titles in the
-library. Firing all of them on every page load isn't really an option. That
-problem alone, on a slower day, would've been its own devlog post: a small
-SQLite cache, keyed per title, topping itself up 15 entries at a time on
-each visit until the whole library's warm. Today it was just one more thing
-that got built on the way to shipping the rest.
+## Surviving a Simkl outage
+
+Simkl's API rules explicitly permit caching user data locally, so alongside
+the per-title cache, `simkl-cache.ts` also keeps a single-row snapshot of the
+*entire* enriched library in `simkl_library_snapshot`. `getLibraryWithFallback()`
+tries the live sync call first and saves a fresh snapshot on success; if the
+call throws, it serves the last saved snapshot instead of an empty page, with
+a `stale` flag the UI turns into a small banner ("showing a cached copy
+from…"). `simkl-refresh.ts` also runs the same refresh on a 24-hour timer
+independent of page traffic, so the fallback doesn't go stale just because
+nobody visited the page in a while.
+
+## What it adds up to
+
+The stats section reads like Simkl's own stats page: watch time in days and
+hours (from real per-title runtimes, not an estimate), peak year, most active
+weekday, average rating, backlog size with hours-to-clear, completion rate,
+and a top-5 genre breakdown — all computed from the same enriched library the
+grids already have in memory, no extra queries. It's also the one page on
+the site that breaks out of the usual narrow, centered column — search,
+sort, and stats all use the full width, since a six-column poster grid needs
+the room.
+
+**Surprise me** isn't a one-line text pick that pops a new tab either — it
+reveals a full spotlight card in place: poster, rating, genres, overview, an
+"Open on Simkl" link, and a "Try another" button to reroll without leaving
+the page.
 
 ## Two tabs, because anime showed up
 
-Somewhere in the middle of all this, anime started showing up in the
-library alongside the kdramas and movies. Rather than mixing *Isekai* and
-*Seinen* genre chips in with kdrama tags, the page split into **TV & Movies**
-and **Anime** — each with its own stats, its own filters, its own everything.
-That could've been a whole separate afternoon. It was maybe twenty minutes.
-
-Started the day with a page that did almost nothing. Ended it with a page
-that has its own database file.
-
-## Update: it outgrew "Watching"
-
-It wasn't just tracking what I was currently watching — completed titles
-and the plan-to-watch backlog were sitting right there too, so the name
-stopped fitting. The page is now **Watchlist** at
-[`/watchlist`](/watchlist); the old `/watching` URL redirects there so
-nothing that already linked to it breaks.
-
-The layout got wider at the same time. It used to share the same narrow,
-centered column as every other page on the site, which made no sense once
-the grid had six columns of posters trying to fit in it. Watchlist is the
-one page that breaks out of that — search, sort, and the stats now use the
-full width too, instead of trailing off into empty space on the right.
-
-The stats strip grew up. Completed count, episodes watched, and completed
-this year are still there, but now sit next to actual watch time — days,
-hours, minutes — computed from real per-title runtimes pulled from Simkl's
-API and cached alongside genres. Peak year, most active weekday, average
-rating, backlog size with hours to clear, completion rate, and a top-5
-genre breakdown round it out. Closer to what Simkl's own stats page shows
-than the three numbers it started with.
-
-**Surprise me** stopped being a one-line text pick that popped a new tab.
-It now reveals a full spotlight card in place — poster, rating, genres,
-overview, an "Open on Simkl" link, and a "Try another" button to reroll
-without leaving the page. [Go see for yourself](/watchlist).
+Anime titles started showing up in the library alongside the kdramas and
+movies, and mixing *Isekai*/*Seinen* genre chips in with kdrama tags didn't
+read well as one filter set. The page split into **TV & Movies** and
+**Anime** tabs, each with its own stats, its own filters, its own "Surprise
+me" — scoped so the shuffle button never hands a TV-and-movies session an
+anime pick by accident. [Go see for yourself](/watchlist).
