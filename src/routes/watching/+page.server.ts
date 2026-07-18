@@ -1,15 +1,17 @@
-import { getLibrary, simklConfigured } from '$lib/server/simkl';
+import { enrichLibrary, getLibrary, simklConfigured } from '$lib/server/simkl';
 import type { PageServerLoad } from './$types';
+
+const EMPTY_LIBRARY = { watching: [], completed: [], planToWatch: [], onHold: [], dropped: [] };
 
 export const load: PageServerLoad = async () => {
 	if (!simklConfigured()) {
-		return { configured: false, watching: [], completed: [], planToWatch: [] };
+		return { configured: false, ...EMPTY_LIBRARY };
 	}
 
 	try {
-		const library = await getLibrary();
+		const library = await enrichLibrary(await getLibrary());
 		return { configured: true, ...library };
 	} catch {
-		return { configured: true, watching: [], completed: [], planToWatch: [], error: true };
+		return { configured: true, ...EMPTY_LIBRARY, error: true };
 	}
 };

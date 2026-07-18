@@ -16,7 +16,7 @@ Package manager is pnpm (`packageManager: pnpm@11.3.0`).
 - `pnpm check` — `svelte-kit sync` + `svelte-check` (type checking; no separate lint script)
 - `node build/index.js` — run the built server (what the Docker image's `CMD` does)
 
-There is no test suite/runner in this repo.
+- `pnpm test` — runs the Vitest suite (`src/**/*.test.ts`)
 
 ## Architecture
 
@@ -36,6 +36,8 @@ There is no test suite/runner in this repo.
 **Styling**: Tailwind CSS 4 via `@tailwindcss/vite` (no separate Tailwind config file — v4 style). Design tokens/custom properties in [src/lib/styles/tokens.css](src/lib/styles/tokens.css). Both light and dark mode are supported ([ThemeToggle.svelte](src/lib/components/ThemeToggle.svelte)).
 
 **Deployment**: Multi-stage Dockerfile builds with full devDependencies, then prunes dev-only packages from the resolved `node_modules` tree rather than doing a fresh `pnpm install --prod` (see comments in [Dockerfile](Dockerfile) for why — peerDependency resolution would otherwise re-pull the whole dev toolchain). `ORIGIN` env var must be set in production (adapter-node needs it to build absolute URLs / validate request origin behind Traefik) — set it in Coolify's environment UI, not in a committed `.env`.
+
+**Persistent data volume**: Two SQLite files live under `data/` at the repo/container root — `notes.db` (private notes, [notes.ts](src/lib/server/notes.ts)) and `simkl-cache.db` (cached Simkl genre/synopsis lookups, [simkl-cache.ts](src/lib/server/simkl-cache.ts)). Both default to `./data/*.db` (overridable via `NOTES_DB_PATH` / `SIMKL_CACHE_DB_PATH`, see [.env.example](.env.example)) and the Dockerfile declares `/app/data` as a `VOLUME`, but that alone does **not** persist anything across a Coolify redeploy — Coolify replaces the container from the image each deploy, so an anonymous volume goes with it. In Coolify, under the app's **Storages** tab, add a persistent volume mounted at `/app/data` (any volume name) *before* the first real deploy. Losing `notes.db` loses real content; losing `simkl-cache.db` just means the Watching page's genre/synopsis data goes cold and re-warms itself over the next several page loads (see `enrichLibrary` in [simkl.ts](src/lib/server/simkl.ts)) — not destructive, just worth knowing so redeploys don't look like a regression.
 
 ## Icons
 

@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { getCachedDetails, upsertDetail, cacheKey } from './simkl-cache';
 
 const APP_NAME = 'razerghost-site';
 const APP_VERSION = '1.0';
@@ -9,12 +10,27 @@ export type LibraryItem = {
 	href: string;
 	watchedEpisodes: number;
 	totalEpisodes: number | null;
+	// 0-10, unset until the user rates the title on Simkl.
+	rating: number | null;
+	lastWatchedAt: string | null;
+	// e.g. "S03E01" — the next unwatched episode, if any.
+	nextToWatch: string | null;
+	addedAt: string;
+	simklId: number;
+	mediaType: SimklType;
+	// Filled in by enrichLibrary() from the per-title detail endpoint + a
+	// local cache — empty/null until that's run (or if it hasn't been able
+	// to fetch this particular title yet, see enrichLibrary's comment).
+	genres: string[];
+	overview: string | null;
 };
 
 export type Library = {
 	watching: LibraryItem[];
 	completed: LibraryItem[];
 	planToWatch: LibraryItem[];
+	onHold: LibraryItem[];
+	dropped: LibraryItem[];
 };
 
 export function simklConfigured(): boolean {
@@ -30,15 +46,19 @@ function posterUrl(path: string | null | undefined): string | null {
 }
 
 const SIMKL_PATH = { shows: 'tv', anime: 'anime', movies: 'movies' } as const;
-type SimklType = keyof typeof SIMKL_PATH;
+export type SimklType = keyof typeof SIMKL_PATH;
 
 type AllItemsEntry = {
 	status: string;
 	watched_episodes_count: number;
 	total_episodes_count: number;
+	user_rating: number | null;
+	last_watched_at: string | null;
+	next_to_watch?: string;
+	added_to_watchlist_at: string;
 	// Mutually exclusive: shows/anime nest under `show`, movies under `movie`.
-	show?: { title: string; poster?: string | null; ids: { slug: string } };
-	movie?: { title: string; poster?: string | null; ids: { slug: string } };
+	show?: { title: string; poster?: string | null; ids: { slug: string; simkl: number } };
+	movie?: { title: string; poster?: string | null; ids: { slug: string; simkl: number } };
 };
 
 async function fetchAll(type: SimklType): Promise<{ status: string; item: LibraryItem }[]> {
@@ -70,10 +90,20 @@ async function fetchAll(type: SimklType): Promise<{ status: string; item: Librar
 			item: {
 				title: media.title,
 				posterUrl: posterUrl(media.poster),
-				href: `https://simkl.com/${SIMKL_PATH[type]}/${media.ids.slug}`,
+				// Simkl's URLs require the numeric id, not just the slug —
+				// "/tv/<slug>" alone 404s into the generic discover page.
+				href: `https://simkl.com/${SIMKL_PATH[type]}/${media.ids.simkl}/${media.ids.slug}`,
 				watchedEpisodes: entry.watched_episodes_count,
 				// 0 on movies (not a meaningful episode count) — treat as absent.
-				totalEpisodes: entry.total_episodes_count || null
+				totalEpisodes: entry.total_episodes_count || null,
+				rating: entry.user_rating ?? null,
+				lastWatchedAt: entry.last_watched_at,
+				nextToWatch: entry.next_to_watch ?? null,
+				addedAt: entry.added_to_watchlist_at,
+				simklId: media.ids.simkl,
+				mediaType: type,
+				genres: [],
+				overview: null
 			}
 		};
 	});
@@ -86,9 +116,77 @@ export async function getLibrary(): Promise<Library> {
 	const results = await Promise.all([fetchAll('shows'), fetchAll('anime'), fetchAll('movies')]);
 	const all = results.flat();
 
+	const byStatus = (status: string) => all.filter((e) => e.status === status).map((e) => e.item);
+
 	return {
-		watching: all.filter((e) => e.status === 'watching').map((e) => e.item),
-		completed: all.filter((e) => e.status === 'completed').map((e) => e.item),
-		planToWatch: all.filter((e) => e.status === 'plantowatch').map((e) => e.item)
+		watching: byStatus('watching'),
+		completed: byStatus('completed'),
+		planToWatch: byStatus('plantowatch'),
+		onHold: byStatus('hold'),
+		dropped: byStatus('dropped')
+	};
+}
+
+// Genres/overview aren't in the bulk sync-all-items response above — only
+// available from a per-title detail call. Fetching one per title on every
+// page load (~250 titles) would be both slow and a lot of load on Simkl's
+// public endpoint, so results are cached in SQLite (simkl-cache.ts) and this
+// only ever tops up a small, bounded batch of missing/stale entries per
+// request. A library this size fully warms over a handful of page loads;
+// titles beyond the batch just render without genres/overview until their
+// turn comes up, same "degrade gracefully" approach as the rest of the page.
+const DETAIL_BATCH_SIZE = 15;
+const STALE_AFTER_MS = 60 * 24 * 60 * 60 * 1000; // 60 days — genres/overview rarely change
+
+async function fetchDetail(simklId: number, type: SimklType): Promise<{ genres: string[]; overview: string } | null> {
+	const params = new URLSearchParams({ client_id: env.SIMKL_CLIENT_ID ?? '', extended: 'full' });
+	const res = await fetch(`https://api.simkl.com/${SIMKL_PATH[type]}/${simklId}?${params}`, {
+		headers: { 'User-Agent': `${APP_NAME}/${APP_VERSION}` }
+	});
+	if (!res.ok) return null;
+
+	const data = await res.json();
+	return {
+		genres: Array.isArray(data.genres) ? data.genres : [],
+		overview: typeof data.overview === 'string' ? data.overview : ''
+	};
+}
+
+export async function enrichLibrary(library: Library): Promise<Library> {
+	const buckets = [...library.watching, ...library.completed, ...library.planToWatch, ...library.onHold, ...library.dropped];
+	if (buckets.length === 0) return library;
+
+	const keys = buckets.map((item) => ({ simklId: item.simklId, mediaType: item.mediaType }));
+	const cached = getCachedDetails(keys);
+	const now = Date.now();
+
+	const stale = buckets.filter((item) => {
+		const hit = cached.get(cacheKey(item.simklId, item.mediaType));
+		return !hit || now - new Date(hit.fetchedAt).getTime() > STALE_AFTER_MS;
+	});
+
+	const toFetch = stale.slice(0, DETAIL_BATCH_SIZE);
+	// One flaky detail request shouldn't sink the whole page — the library
+	// itself already loaded successfully by this point, enrichment is a bonus.
+	await Promise.allSettled(
+		toFetch.map(async (item) => {
+			const detail = await fetchDetail(item.simklId, item.mediaType);
+			if (detail) upsertDetail(item.simklId, item.mediaType, detail.genres, detail.overview);
+		})
+	);
+
+	const merged = toFetch.length > 0 ? getCachedDetails(keys) : cached;
+	const applyDetails = (items: LibraryItem[]): LibraryItem[] =>
+		items.map((item) => {
+			const hit = merged.get(cacheKey(item.simklId, item.mediaType));
+			return hit ? { ...item, genres: hit.genres, overview: hit.overview || null } : item;
+		});
+
+	return {
+		watching: applyDetails(library.watching),
+		completed: applyDetails(library.completed),
+		planToWatch: applyDetails(library.planToWatch),
+		onHold: applyDetails(library.onHold),
+		dropped: applyDetails(library.dropped)
 	};
 }

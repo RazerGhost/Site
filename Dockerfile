@@ -55,6 +55,16 @@ COPY src/lib/server/fonts ./src/lib/server/fonts
 
 EXPOSE 3000
 
+# SQLite state that must survive redeploys: notes.db (src/lib/server/notes.ts)
+# and simkl-cache.db (src/lib/server/simkl-cache.ts), both default to living
+# under here. The VOLUME line alone does NOT persist anything across a
+# Coolify redeploy — Coolify replaces the container from the image each
+# deploy, so an anonymous volume goes with it. A real deploy needs a
+# persistent volume mounted at this same path in Coolify's "Storages" tab
+# (see the "Persistent data volume" section in CLAUDE.md).
+RUN mkdir -p data
+VOLUME ["/app/data"]
+
 # node:22-slim has neither curl nor wget, so the check shells out to Node's
 # own http client instead of a missing binary.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
