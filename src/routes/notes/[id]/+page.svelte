@@ -1,11 +1,14 @@
 <script lang="ts">
+	import { marked } from 'marked';
 	import Seo from '$lib/components/Seo.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
 	const title = $derived(form?.title ?? data.note.title);
-	const body = $derived(form?.body ?? data.note.body);
+	let body = $state(form?.body ?? data.note.body);
+	let mode = $state<'write' | 'preview'>('write');
+	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
 </script>
 
 <Seo title="{data.note.title} — RazerGhost" description="Private notes." path="/notes/{data.note.id}" noindex />
@@ -28,13 +31,40 @@
 			required
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
+		<div class="flex gap-1 text-xs">
+			<button
+				type="button"
+				onclick={() => (mode = 'write')}
+				class="rounded-full px-3 py-1 transition-colors {mode === 'write'
+					? 'bg-primary/10 text-primary'
+					: 'text-dim hover:text-white'}"
+			>
+				Write
+			</button>
+			<button
+				type="button"
+				onclick={() => (mode = 'preview')}
+				class="rounded-full px-3 py-1 transition-colors {mode === 'preview'
+					? 'bg-primary/10 text-primary'
+					: 'text-dim hover:text-white'}"
+			>
+				Preview
+			</button>
+		</div>
+
 		<textarea
 			name="body"
+			bind:value={body}
 			required
 			rows="16"
+			hidden={mode === 'preview'}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-			>{body}</textarea
-		>
+		></textarea>
+		{#if mode === 'preview'}
+			<div class="devlog-content rounded-lg border border-border px-4 py-2">
+				{@html previewHtml}
+			</div>
+		{/if}
 
 		<div class="flex items-center justify-between">
 			<div class="flex gap-3">

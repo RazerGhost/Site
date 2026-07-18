@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { attachCopyButtons } from '$lib/actions/copy-code';
 	import { mountEmbeds } from '$lib/actions/mount-embeds';
-	import Comments from '$lib/components/Comments.svelte';
 	import DevlogCard from '$lib/components/DevlogCard.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import ShareButtons from '$lib/components/ShareButtons.svelte';
@@ -167,6 +166,4 @@
 			</div>
 		</div>
 	{/if}
-
-	<Comments />
 </main>

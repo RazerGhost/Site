@@ -8,3 +8,9 @@ export function escapeXml(value: string): string {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&apos;');
 }
+
+// A literal "]]>" inside the payload would otherwise terminate the CDATA
+// section early — split it across two adjacent CDATA blocks instead.
+export function cdata(value: string): string {
+	return `<![CDATA[${value.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}

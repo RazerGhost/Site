@@ -30,6 +30,69 @@ export const socialLinks = [
   },
 ];
 
+export const gearGroups = [
+  {
+    label: "Editor",
+    icon: "code" as const,
+    items: ["Zed", "Claude Code"],
+  },
+  {
+    label: "Stack",
+    icon: "layers" as const,
+    items: ["SvelteKit", "TypeScript", "Tailwind CSS", "Node.js"],
+  },
+  {
+    label: "Daily Tools",
+    icon: "wrench" as const,
+    items: [
+      "Zen Browser",
+      "Windows",
+      "Windows Terminal",
+      "Tabby",
+      "PowerShell",
+      "Figma",
+      "Affinity",
+      "DaVinci Resolve",
+      "Proton Mail",
+      "Proton Pass",
+      "Proton Drive",
+      "Proton VPN",
+      "Discord",
+      "WhatsApp",
+    ],
+  },
+  {
+    label: "Desktop",
+    icon: "cpu" as const,
+    items: [
+      "AMD Ryzen 7 7800X3D",
+      "Gigabyte RTX 3070 Eagle OC",
+      "AOC 24G1WG4 (24\")",
+      "Dell P2414H (24\")",
+    ],
+  },
+  {
+    label: "Peripherals",
+    icon: "keyboard" as const,
+    items: ["Keychron K10 HE Wireless", "Keychron M6 8K"],
+  },
+  {
+    label: "Audio",
+    icon: "headphones" as const,
+    items: ["Elgato Wave:3 MK.2", "Simgot EW300 DSP"],
+  },
+  {
+    label: "Sim & Gaming",
+    icon: "gamepad" as const,
+    items: ["MOZA R3 Racing Kit", "GameSir Xbox Controller", "Steam Controller"],
+  },
+  {
+    label: "Streaming",
+    icon: "video" as const,
+    items: ["Elgato Stream Deck MK.1"],
+  },
+];
+
 export const navLinks = [
   { label: "Projects", href: "/projects" },
   { label: "Devlog", href: "/devlog" },
@@ -37,25 +100,3 @@ export const navLinks = [
   { label: "Gear", href: "/gear" },
   { label: "Watching", href: "/watching" },
 ];
-
-// Comments on devlog posts, via giscus (https://giscus.app) — backed by
-// GitHub Discussions on this repo. Not secret (same "public identifier"
-// status as discordUserId above), so it lives here rather than in an env
-// var. Comments.svelte renders nothing until repoId/categoryId are filled in.
-//
-// One-time setup (repo admin):
-// 1. Enable Discussions on https://github.com/RazerGhost/Site
-//    (repo Settings → Features → Discussions)
-// 2. Visit https://giscus.app, enter the repo, pick a discussion category
-//    (e.g. "General" or a dedicated "Comments" category), and copy the
-//    repoId/categoryId values it generates into this object.
-export const giscus = {
-  repo: "RazerGhost/Site" as const,
-  repoId: "",
-  category: "General",
-  categoryId: "",
-};
-
-export function giscusConfigured(): boolean {
-  return Boolean(giscus.repoId && giscus.categoryId);
-}

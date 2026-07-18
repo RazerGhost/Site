@@ -1,30 +1,42 @@
-import { getAllProjects } from '$lib/server/projects';
+import { getAllProjects, getProject } from '$lib/server/projects';
 import { site } from '$lib/config';
-import { escapeXml } from '$lib/server/xml';
+import { cdata, escapeXml } from '$lib/server/xml';
 import type { RequestHandler } from './$types';
+
+function resolveUrl(src: string): string {
+	return src.startsWith('http') ? src : `${site.url}${src}`;
+}
 
 export const GET: RequestHandler = () => {
 	const projects = getAllProjects();
 
 	const items = projects
-		.map(
-			(project) => `
+		.map((meta) => {
+			const project = getProject(meta.slug);
+			const imageUrl = resolveUrl(meta.cover ?? `/projects/${meta.slug}/og.png`);
+			const contentHtml = project
+				? `<img src="${imageUrl}" alt="" />${project.html}`
+				: escapeXml(meta.description);
+
+			return `
 		<item>
-			<title>${escapeXml(project.name)}</title>
-			<link>${site.url}/projects/${project.slug}</link>
-			<guid>${site.url}/projects/${project.slug}</guid>
-			<pubDate>${new Date(project.date).toUTCString()}</pubDate>
-			<description>${escapeXml(project.description)}</description>
-		</item>`
-		)
+			<title>${escapeXml(meta.name)}</title>
+			<link>${site.url}/projects/${meta.slug}</link>
+			<guid>${site.url}/projects/${meta.slug}</guid>
+			<pubDate>${new Date(meta.date).toUTCString()}</pubDate>
+			<description>${escapeXml(meta.description)}</description>
+			<content:encoded>${cdata(contentHtml)}</content:encoded>
+		</item>`;
+		})
 		.join('');
 
 	const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
 	<channel>
 		<title>${escapeXml(site.name)} — Projects</title>
 		<link>${site.url}/projects</link>
-		<description>${escapeXml(site.description)}</description>${items}
+		<description>${escapeXml(site.description)}</description>
+		<atom:link href="${site.url}/projects/rss.xml" rel="self" type="application/rss+xml" />${items}
 	</channel>
 </rss>`;
 
