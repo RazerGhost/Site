@@ -6,7 +6,7 @@ Widgets that are simpler than the [Watchlist](watchlist.md) / [Listens](listens.
 
 [SpotifyWidget.svelte](../src/lib/components/SpotifyWidget.svelte) + [spotify.ts](../src/lib/server/spotify.ts) + `src/routes/api/spotify/*`.
 
-Uses the OAuth **refresh-token** flow (not authorization-code-per-request) — `SPOTIFY_REFRESH_TOKEN` is minted once during setup (see [.env.example](../.env.example)) and exchanged for a short-lived access token on demand. `getSpotifyAccessToken()` caches that access token **in-memory, per server process** (module-level variable, not per-request) and only re-fetches once it's within 60s of expiring — this means every visitor polling the widget shares one refreshed token instead of each hitting Spotify's token endpoint.
+Uses the OAuth **refresh-token** flow (not authorization-code-per-request) — `SPOTIFY_REFRESH_TOKEN` is minted once during setup (see [environment.md](environment.md)) and exchanged for a short-lived access token on demand. `getSpotifyAccessToken()` caches that access token **in-memory, per server process** (module-level variable, not per-request) and only re-fetches once it's within 60s of expiring — this means every visitor polling the widget shares one refreshed token instead of each hitting Spotify's token endpoint.
 
 `spotifyConfigured()` gates the widget off entirely (renders "Spotify not connected") when the three env vars aren't all set. The recently-played history section within the widget additionally hides itself if the refresh token was only granted `user-read-currently-playing` without `user-read-recently-played`.
 

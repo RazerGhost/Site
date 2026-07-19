@@ -2,6 +2,7 @@
 
 In-depth, implementation-level documentation. Start with the top-level [README.md](../README.md) for setup and a quick tour — these docs go deeper on *how* each subsystem actually works, for when you're modifying it rather than just running it.
 
+- [environment.md](environment.md) — one-time setup steps for every `.env` variable (OAuth apps, PIN flows, generating secrets)
 - [content-pipeline.md](content-pipeline.md) — devlog + projects markdown pipeline, embeds, RSS/OG image generation
 - [auth.md](auth.md) — GitHub OAuth login gate, session cookies
 - [notes.md](notes.md) — `/notes` data model, full-text search, revisions, soft delete

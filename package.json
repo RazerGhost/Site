@@ -2,6 +2,12 @@
 	"name": "ghostbase",
 	"version": "0.0.1",
 	"private": true,
+	"license": "SEE LICENSE IN LICENSE",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/RazerGhost/ghostbase.git"
+	},
+	"homepage": "https://razerghost.xyz",
 	"type": "module",
 	"engines": {
 		"node": ">=20"

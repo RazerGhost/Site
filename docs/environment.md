@@ -1,0 +1,100 @@
+# Environment variables
+
+One-time setup steps for every variable in [.env.example](../.env.example). That file itself stays a clean list of names — this doc is where the "how do I actually get one of these" detail lives.
+
+Every integration here is optional and degrades gracefully: the site runs fine with an empty `.env`, just with the affected widget/page showing a "not connected" state instead of data.
+
+## `ORIGIN`
+
+**Required in production.** adapter-node needs this to build absolute URLs and validate incoming request origins when running behind a reverse proxy (Coolify's Traefik) — without it, adapter-node falls back to guessing from request headers, which can misbehave behind a proxy. Set in Coolify's environment variables UI, not in a committed `.env`. Example: `https://razerghost.xyz`.
+
+## Spotify "now playing" widget
+
+Powers [SpotifyWidget.svelte](../src/lib/components/SpotifyWidget.svelte). Shows "Spotify not connected" if unset.
+
+1. Create an app at https://developer.spotify.com/dashboard.
+2. `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` come from that app.
+3. `SPOTIFY_REFRESH_TOKEN` requires a one-time OAuth authorization-code flow with the `user-read-currently-playing user-read-recently-played` scopes (space-separated in the authorize URL's `scope` param), exchanged for a refresh token — a manual step done once, not part of the app itself. The recently-played history section of the widget silently hides itself if the token only has `user-read-currently-playing`.
+
+See [integrations.md](integrations.md) for how the token is used at runtime.
+
+## `SPOTIFY_HISTORY_DB_PATH` / Listens page
+
+Powers `/listens`, built from Spotify's own "extended streaming history" data export (request it at https://support.spotify.com/us/article/understanding-your-data/, can take up to 30 days to arrive), not the live API. Upload the export's JSON files at `/spotify-import`, gated behind the same GitHub login as `/notes` — no separate credentials needed.
+
+Optional — path to the SQLite file backing this page ([spotify-history-db.ts](../src/lib/server/spotify-history-db.ts)). Defaults to `./data/spotify-history.db` if unset. Unlike `NOTES_DB_PATH`, this file is not trivially rebuildable if lost: the export is a one-time historical dump, so make sure this points inside the same persistent Coolify volume as the other `*_DB_PATH` vars.
+
+See [listens.md](listens.md) for the import/parsing details.
+
+## `SPOTIFY_SCROBBLE_SECRET`
+
+Optional — enables live scrobbling into `spotify-history.db` between manual exports ([+server.ts](../src/routes/api/spotify/scrobble/+server.ts)). Requires the Spotify vars above with the `user-read-recently-played` scope. If set, hit `GET /api/spotify/scrobble` with an `Authorization: Bearer <this value>` header on a schedule (every 15-30 min — Spotify's recently-played endpoint only returns the last 50 plays, so longer gaps lose history) via Coolify's cron or an external scheduler. `?secret=<this value>` also works, but the header is preferred — query strings tend to end up in proxy/access logs. Leave unset to disable the endpoint (it 503s without this).
+
+## `SIMKL_CLIENT_ID` / `SIMKL_ACCESS_TOKEN`
+
+Powers `/watching` ([simkl.ts](../src/lib/server/simkl.ts)). Shows "Simkl not connected" if unset. Simkl's access tokens are long-lived (~5 years) and don't need a refresh flow, unlike Spotify's above.
+
+1. Register an app at https://simkl.com/settings/developer/ to get a `SIMKL_CLIENT_ID` (no client secret needed for the PIN flow below).
+2. Get `SIMKL_ACCESS_TOKEN` via Simkl's PIN flow (built for devices without a browser — a good fit for a one-time server-side setup too). Run once:
+   ```
+   node -e "
+     const clientId = 'YOUR_CLIENT_ID';
+     (async () => {
+       const headers = { 'User-Agent': 'ghostbase/1.0' };
+       const params = 'client_id=' + clientId + '&app-name=ghostbase&app-version=1.0';
+       const pin = await (await fetch('https://api.simkl.com/oauth/pin?' + params, { headers })).json();
+       console.log('Go to', pin.verification_uri, 'and enter code:', pin.user_code);
+       const poll = async () => {
+         const r = await (await fetch('https://api.simkl.com/oauth/pin/' + pin.user_code + '?' + params, { headers })).json();
+         if (r.result === 'OK' && r.access_token) { console.log('SIMKL_ACCESS_TOKEN=' + r.access_token); return; }
+         setTimeout(poll, (pin.interval || 5) * 1000);
+       };
+       poll();
+     })();
+   "
+   ```
+
+See [watchlist.md](watchlist.md) for caching/enrichment details.
+
+## `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
+
+Gates `/notes` (and `/spotify-import`), restricted to a single GitHub account — the one matching `site.githubUsername` in [config.ts](../src/lib/config.ts). Any other GitHub account is explicitly rejected at `/auth/callback`; no session is issued.
+
+1. Create an OAuth App at https://github.com/settings/developers
+   - Homepage URL: your production URL
+   - Authorization callback URL: `<your production URL>/auth/callback`
+   - Register a *second* OAuth App for local dev, with callback URL `http://localhost:5173/auth/callback` — GitHub requires an exact match and one OAuth App can't have two callback URLs.
+2. `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` come from that app.
+
+See [auth.md](auth.md) for the full login flow.
+
+## `SESSION_SECRET`
+
+Signs the session cookie ([session.ts](../src/lib/server/session.ts)) via HMAC — not a GitHub value. Generate a random secret once:
+
+```
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Rotating this value invalidates all existing sessions.
+
+## `NOTES_DB_PATH` / `NOTES_ATTACHMENTS_DIR`
+
+- `NOTES_DB_PATH` — optional, path to the SQLite file backing `/notes` ([notes.ts](../src/lib/server/notes.ts)). Defaults to `./data/notes.db` if unset. In production this must point inside a Coolify persistent volume mount so notes survive redeploys — do not leave it on the container's ephemeral filesystem.
+- `NOTES_ATTACHMENTS_DIR` — optional, directory holding images pasted/uploaded into note bodies ([+server.ts](../src/routes/api/notes/attachments/+server.ts)). Defaults to `./data/note-attachments` if unset. Point this at the same persistent Coolify volume as `NOTES_DB_PATH` — losing it breaks any note that embeds an image.
+
+## `SIMKL_CACHE_DB_PATH`
+
+Optional — path to the SQLite cache backing the Watching page's genre/synopsis enrichment ([simkl-cache.ts](../src/lib/server/simkl-cache.ts)). Defaults to `./data/simkl-cache.db` if unset. Unlike `NOTES_DB_PATH` above, losing this file isn't destructive — it just goes cold and re-warms itself over the next several page loads — but pointing it at the same Coolify persistent volume as `NOTES_DB_PATH` (i.e. leaving both unset, so they share `./data`) avoids that cold start on every redeploy.
+
+## `STATUS_DB_PATH`
+
+Optional — path to the SQLite file backing the homepage's "Right now" status card, edited at `/notes/status` ([status-db.ts](../src/lib/server/status-db.ts)). Defaults to `./data/status.db` if unset. Losing this is non-destructive — it just reverts to the hardcoded fallback in `status-db.ts`.
+
+## `BACKUP_SECRET` / `BACKUP_GIT_REMOTE` / `BACKUP_GIT_BRANCH` / `BACKUP_GIT_USER_NAME` / `BACKUP_GIT_USER_EMAIL`
+
+Backs up the four SQLite DBs to a private git repo. See [backups.md](backups.md) for full one-time setup (creating the backup repo, minting a scoped PAT, scheduling the endpoint) — that doc covers this in more depth than fits here.
+
+## `BODY_SIZE_LIMIT`
+
+Extended streaming history exports can be tens of MB across many files. adapter-node's default request body limit (512kb) will reject uploads above that at `/spotify-import` — raise it in Coolify's environment UI if your export is large. This limit is global, so it also covers image uploads to note bodies at `/api/notes/attachments` (capped at 8MB there). Accepts a byte count with an optional K/M/G suffix (e.g. `200M`) — **not** `0`, which SvelteKit treats as a 0-byte limit rather than "unlimited". Use the literal string `Infinity` to fully disable the limit. See [SvelteKit's adapter-node docs](https://svelte.dev/docs/kit/adapter-node#Environment-variables-BODY_SIZE_LIMIT).

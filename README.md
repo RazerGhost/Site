@@ -44,7 +44,7 @@ Package manager is pnpm (`packageManager: pnpm@11.3.0` — use corepack).
 
 ### Environment variables
 
-Every integration below is optional and degrades gracefully — the site runs fine with an empty `.env`, just with those widgets/pages showing a "not connected" state instead of data. Full setup instructions (including one-time OAuth flows) live as comments in [.env.example](.env.example); summary:
+Every integration below is optional and degrades gracefully — the site runs fine with an empty `.env`, just with those widgets/pages showing a "not connected" state instead of data. Full setup instructions (including one-time OAuth flows) live in [docs/environment.md](docs/environment.md); summary:
 
 | Variable(s) | Powers | Notes |
 | --- | --- | --- |

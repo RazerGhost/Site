@@ -18,7 +18,7 @@ Sessions are a self-contained signed token, not a server-side session store:
 base64url(json({ sub: login, exp: timestamp })) + "." + HMAC-SHA256(payload, SESSION_SECRET)
 ```
 
-`verifySessionToken` re-derives the signature and does a `timingSafeEqual` comparison before trusting the payload, then checks expiry. There's no revocation list — rotating `SESSION_SECRET` is the only way to invalidate all sessions at once (also mentioned in [.env.example](../.env.example)).
+`verifySessionToken` re-derives the signature and does a `timingSafeEqual` comparison before trusting the payload, then checks expiry. There's no revocation list — rotating `SESSION_SECRET` is the only way to invalidate all sessions at once (see [environment.md](environment.md) for how to generate one).
 
 ## Local dev
 
