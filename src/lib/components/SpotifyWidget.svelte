@@ -130,11 +130,20 @@
 
 	// Local 1s ticker while playing: drives the progress bar between polls
 	// and accumulates today's listening time, without hitting the API.
+	// listenedDate tracks which day the counter belongs to — a tab left open
+	// across midnight resets to zero instead of carrying yesterday's total
+	// into the new day's localStorage key.
+	let listenedDate = dateKey();
 	$effect(() => {
 		if (!data?.playing) return;
 		let last = Date.now();
 		const id = setInterval(() => {
 			const current = Date.now();
+			const today = dateKey();
+			if (today !== listenedDate) {
+				listenedDate = today;
+				listenedMsToday = 0;
+			}
 			listenedMsToday += current - last;
 			last = current;
 			now = current;

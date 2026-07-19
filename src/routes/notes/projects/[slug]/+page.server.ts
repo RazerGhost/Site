@@ -39,23 +39,27 @@ export const actions: Actions = {
 			return fail(400, { name, date, description, href, live, cover, tags, body, error: 'Name and date are required.' });
 		}
 
-		writeEntry(
-			CONTENT_DIR,
-			params.slug,
-			{
-				name,
-				description,
-				...(href ? { href } : {}),
-				...(live ? { live } : {}),
-				...(cover ? { cover } : {}),
-				tags: tags
-					.split(',')
-					.map((t) => t.trim())
-					.filter(Boolean),
-				date
-			},
-			body
-		);
+		try {
+			writeEntry(
+				CONTENT_DIR,
+				params.slug,
+				{
+					name,
+					description,
+					...(href ? { href } : {}),
+					...(live ? { live } : {}),
+					...(cover ? { cover } : {}),
+					tags: tags
+						.split(',')
+						.map((t) => t.trim())
+						.filter(Boolean),
+					date
+				},
+				body
+			);
+		} catch (e) {
+			return fail(400, { name, date, description, href, live, cover, tags, body, error: (e as Error).message });
+		}
 
 		redirect(303, `/notes/projects/${params.slug}`);
 	},

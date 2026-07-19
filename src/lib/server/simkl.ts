@@ -242,17 +242,32 @@ export async function refreshLibrarySnapshot(): Promise<Library> {
 
 export type LibraryResult = { library: Library; stale: boolean; staleSince: string | null };
 
+// How long a snapshot counts as "fresh enough to serve without asking Simkl".
+// Page loads inside this window never wait on Simkl at all; the 24h
+// background loop (simkl-refresh.ts) plus post-window page loads keep it
+// current. Watchlist changes show up within this window at worst.
+const SNAPSHOT_FRESH_MS = 15 * 60 * 1000;
+
 // Simkl's rules explicitly encourage local caching of user data
 // (https://api.simkl.org/api-rules), so a full-library snapshot is kept in
-// SQLite and served here whenever the live sync-all-items call fails —
-// better than an empty page during a Simkl outage. Rethrows if there's no
-// snapshot yet (e.g. first run before anything's ever succeeded).
+// SQLite and served here. Serving order:
+//   1. a fresh-enough snapshot — no network at all, so homepage/watchlist
+//      latency is never coupled to Simkl's,
+//   2. a live refresh (which re-saves the snapshot),
+//   3. a stale snapshot if the live call fails — better than an empty page
+//      during a Simkl outage.
+// Rethrows only if there's no snapshot at all (first run before anything's
+// ever succeeded).
 export async function getLibraryWithFallback(): Promise<LibraryResult> {
+	const snapshot = getLibrarySnapshot<Library>();
+	if (snapshot && Date.now() - new Date(snapshot.fetchedAt).getTime() < SNAPSHOT_FRESH_MS) {
+		return { library: snapshot.data, stale: false, staleSince: null };
+	}
+
 	try {
 		const library = await refreshLibrarySnapshot();
 		return { library, stale: false, staleSince: null };
 	} catch (err) {
-		const snapshot = getLibrarySnapshot<Library>();
 		if (snapshot) return { library: snapshot.data, stale: true, staleSince: snapshot.fetchedAt };
 		throw err;
 	}

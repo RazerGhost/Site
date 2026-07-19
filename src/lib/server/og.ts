@@ -49,7 +49,30 @@ export interface OgImageOptions {
 	eyebrow?: string;
 }
 
-export async function renderOgImage({ title, tags, eyebrow }: OgImageOptions): Promise<Buffer> {
+// satori + resvg cost real CPU per render, and crawlers re-fetch og.png
+// liberally — cache finished PNGs keyed on the exact inputs, so a changed
+// title/tags naturally becomes a new entry. Bounded FIFO: at a few posts
+// per site this never evicts in practice, the cap just keeps a scraper
+// probing bogus slugs from growing the map unboundedly (404s never render,
+// so only real pages land here — the cap is pure belt-and-braces).
+const MAX_CACHED_IMAGES = 100;
+const imageCache = new Map<string, Buffer>();
+
+export async function renderOgImage(options: OgImageOptions): Promise<Buffer> {
+	const key = JSON.stringify(options);
+	const cached = imageCache.get(key);
+	if (cached) return cached;
+
+	const png = await renderOgImageUncached(options);
+	if (imageCache.size >= MAX_CACHED_IMAGES) {
+		const oldest = imageCache.keys().next().value;
+		if (oldest !== undefined) imageCache.delete(oldest);
+	}
+	imageCache.set(key, png);
+	return png;
+}
+
+async function renderOgImageUncached({ title, tags, eyebrow }: OgImageOptions): Promise<Buffer> {
 	const tree: OgNode = {
 		type: 'div',
 		props: {

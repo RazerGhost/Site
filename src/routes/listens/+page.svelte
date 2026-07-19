@@ -144,15 +144,25 @@
         }
         searching = true;
         searchTimeout = setTimeout(async () => {
-            const res = await fetch(
-                `/api/listening/search?q=${encodeURIComponent(q)}`,
-            );
-            const body = await res.json();
-            searchResults = body.results ?? [];
-            searchedFor = q;
-            searching = false;
-            for (const r of searchResults as SearchResult[]) {
-                if (r.spotifyUri) fetchArt(r.spotifyUri);
+            try {
+                const res = await fetch(
+                    `/api/listening/search?q=${encodeURIComponent(q)}`,
+                );
+                const body = await res.json();
+                // A newer keystroke may have superseded this request while it
+                // was in flight — never overwrite fresher results with stale ones.
+                if (q !== query.trim()) return;
+                searchResults = body.results ?? [];
+                searchedFor = q;
+                for (const r of searchResults as SearchResult[]) {
+                    if (r.spotifyUri) fetchArt(r.spotifyUri);
+                }
+            } catch {
+                if (q !== query.trim()) return;
+                searchResults = [];
+                searchedFor = q;
+            } finally {
+                if (q === query.trim()) searching = false;
             }
         }, 250);
     }
@@ -180,11 +190,19 @@
             return;
         }
         expandedArtist = artist;
-        const res = await fetch(
-            `/api/listening/artist?artist=${encodeURIComponent(artist)}`,
-        );
-        const body = await res.json();
-        artistTracks = body.tracks ?? [];
+        artistTracks = [];
+        try {
+            const res = await fetch(
+                `/api/listening/artist?artist=${encodeURIComponent(artist)}`,
+            );
+            const body = await res.json();
+            // Ignore a slow response for an artist that's no longer the one
+            // expanded — rapid clicks would otherwise show the wrong tracks.
+            if (expandedArtist !== artist) return;
+            artistTracks = body.tracks ?? [];
+        } catch {
+            // Row just stays empty — nothing worse to do here.
+        }
     }
 </script>
 

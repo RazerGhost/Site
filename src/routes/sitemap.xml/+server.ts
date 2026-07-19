@@ -9,7 +9,11 @@ function url(loc: string, date?: string): string {
 	// Frontmatter dates come back from gray-matter as parsed Date objects
 	// (via js-yaml), stringified inconsistently upstream — normalize to
 	// YYYY-MM-DD (W3C datetime) here rather than trusting the input format.
-	const lastmod = date ? new Date(date).toISOString().slice(0, 10) : undefined;
+	// An unparseable date just drops <lastmod> for that one URL instead of
+	// toISOString() throwing and 500ing the whole sitemap.
+	const parsed = date ? new Date(date) : null;
+	const lastmod =
+		parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : undefined;
 	return `
 	<url>
 		<loc>${site.url}${loc}</loc>${lastmod ? `\n\t\t<lastmod>${lastmod}</lastmod>` : ''}

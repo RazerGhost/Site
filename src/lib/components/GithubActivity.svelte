@@ -85,7 +85,7 @@
 	$effect(() => {
 		let cancelled = false;
 
-		fetch(`https://api.github.com/users/${site.githubUsername}/events/public?per_page=5`)
+		fetch(`https://api.github.com/users/${site.githubUsername}/events/public?per_page=${limit}`)
 			.then((res) => {
 				if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
 				return res.json();

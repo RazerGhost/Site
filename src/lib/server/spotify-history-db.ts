@@ -48,9 +48,29 @@ function getDb(): Database.Database {
 	return db;
 }
 
-// Test-only escape hatch, mirrors notes.ts / simkl-cache.ts.
+// Test-only escape hatch, mirrors notes.ts / simkl-cache.ts. Also drops the
+// aggregate memo — cached results from a previous test's database would
+// otherwise bleed into the next one.
 export function __setDbForTests(instance: Database.Database | null): void {
 	db = instance;
+	aggregateCache.clear();
+}
+
+// The plays table only changes on imports and scrobbles (writes measured in
+// per-day counts), while the homepage and /listens aggregate over the whole
+// table on every view — so aggregate results are memoized here and the whole
+// memo dropped on any write. Values are cached per stringified-args key.
+const aggregateCache = new Map<string, unknown>();
+
+function invalidateAggregates(): void {
+	aggregateCache.clear();
+}
+
+function memoized<T>(key: string, compute: () => T): T {
+	if (aggregateCache.has(key)) return aggregateCache.get(key) as T;
+	const value = compute();
+	aggregateCache.set(key, value);
+	return value;
 }
 
 // UNIQUE(played_at, spotify_uri, ms_played) + INSERT OR IGNORE makes this
@@ -74,7 +94,9 @@ export function insertPlays(records: PlayRecord[]): { inserted: number } {
 		}
 		return inserted;
 	});
-	return { inserted: insertAll(records) };
+	const inserted = insertAll(records);
+	if (inserted > 0) invalidateAggregates();
+	return { inserted };
 }
 
 export type ListeningStats = {
@@ -96,6 +118,10 @@ function yearRange(year: number): { yearStart: string; yearEnd: string } {
 }
 
 export function getListeningStats(opts: { year?: number } = {}): ListeningStats {
+	return memoized(`stats:${opts.year ?? 'all'}`, () => computeListeningStats(opts));
+}
+
+function computeListeningStats(opts: { year?: number } = {}): ListeningStats {
 	const database = getDb();
 	const yearFilter = opts.year != null ? `WHERE played_at >= @yearStart AND played_at < @yearEnd` : '';
 	const params = opts.year != null ? yearRange(opts.year) : {};
@@ -149,6 +175,10 @@ export function getListeningStats(opts: { year?: number } = {}): ListeningStats 
 
 // Years with at least one play, newest first — powers the year filter dropdown.
 export function getAvailableYears(): number[] {
+	return memoized('years', () => computeAvailableYears());
+}
+
+function computeAvailableYears(): number[] {
 	const rows = getDb()
 		.prepare(
 			`SELECT DISTINCT CAST(strftime('%Y', played_at) AS INTEGER) as year
@@ -160,23 +190,27 @@ export function getAvailableYears(): number[] {
 
 // One row per day with at least one play in `year` — GitHub-style calendar heatmap.
 export function getHeatmap(year: number): { date: string; plays: number }[] {
-	return getDb()
-		.prepare(
-			`SELECT date(played_at) as date, COUNT(*) as plays
-			 FROM plays WHERE played_at >= @yearStart AND played_at < @yearEnd
-			 GROUP BY date ORDER BY date`
-		)
-		.all(yearRange(year)) as { date: string; plays: number }[];
+	return memoized(`heatmap:${year}`, () =>
+		getDb()
+			.prepare(
+				`SELECT date(played_at) as date, COUNT(*) as plays
+				 FROM plays WHERE played_at >= @yearStart AND played_at < @yearEnd
+				 GROUP BY date ORDER BY date`
+			)
+			.all(yearRange(year)) as { date: string; plays: number }[]
+	);
 }
 
 // Play counts by hour-of-day (0-23), across all history — powers a listening-clock chart.
 export function getHourlyBreakdown(): { hour: number; plays: number }[] {
-	return getDb()
-		.prepare(
-			`SELECT CAST(strftime('%H', played_at) AS INTEGER) as hour, COUNT(*) as plays
-			 FROM plays GROUP BY hour ORDER BY hour`
-		)
-		.all() as { hour: number; plays: number }[];
+	return memoized('hourly', () =>
+		getDb()
+			.prepare(
+				`SELECT CAST(strftime('%H', played_at) AS INTEGER) as hour, COUNT(*) as plays
+				 FROM plays GROUP BY hour ORDER BY hour`
+			)
+			.all() as { hour: number; plays: number }[]
+	);
 }
 
 export type TrackHistory = { plays: number; firstPlayedAt: string; lastPlayedAt: string };
@@ -197,10 +231,12 @@ export function getTrackHistory(spotifyUri: string): TrackHistory | null {
 // ms_played data — surfaced on /spotify-import so it's obvious how much of
 // the archive is still estimate-only.
 export function getLiveScrobbleCount(): number {
-	const row = getDb()
-		.prepare(`SELECT COUNT(*) as count FROM plays WHERE platform = 'live-scrobble'`)
-		.get() as { count: number };
-	return row.count;
+	return memoized('liveScrobbleCount', () => {
+		const row = getDb()
+			.prepare(`SELECT COUNT(*) as count FROM plays WHERE platform = 'live-scrobble'`)
+			.get() as { count: number };
+		return row.count;
+	});
 }
 
 // Removes live-scrobbled rows (see scrobble/+server.ts) within [minPlayedAt,
@@ -215,6 +251,7 @@ export function deleteScrobbledRange(minPlayedAt: string, maxPlayedAt: string): 
 			`DELETE FROM plays WHERE platform = 'live-scrobble' AND played_at BETWEEN @min AND @max`
 		)
 		.run({ min: minPlayedAt, max: maxPlayedAt });
+	if (result.changes > 0) invalidateAggregates();
 	return result.changes;
 }
 
@@ -261,6 +298,12 @@ export type OnThisDayEntry = {
 // "on this day" rediscovery. One row per year, newest first, picking the
 // year's top play if there were several different tracks that day.
 export function getOnThisDay(monthDay: string, excludeYear: number): OnThisDayEntry[] {
+	return memoized(`onThisDay:${monthDay}:${excludeYear}`, () =>
+		computeOnThisDay(monthDay, excludeYear)
+	);
+}
+
+function computeOnThisDay(monthDay: string, excludeYear: number): OnThisDayEntry[] {
 	const rows = getDb()
 		.prepare(
 			`SELECT CAST(strftime('%Y', played_at) AS INTEGER) as year, track, artist,

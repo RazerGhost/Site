@@ -17,13 +17,15 @@ export const GET: RequestHandler = () => {
 			const contentHtml = project
 				? `<img src="${imageUrl}" alt="" />${project.html}`
 				: escapeXml(meta.description);
+			// Drop <pubDate> for an unparseable date rather than emitting the
+			// literal string "Invalid Date" into the feed.
+			const pubDate = new Date(meta.date);
 
 			return `
 		<item>
 			<title>${escapeXml(meta.name)}</title>
 			<link>${site.url}/projects/${meta.slug}</link>
-			<guid>${site.url}/projects/${meta.slug}</guid>
-			<pubDate>${new Date(meta.date).toUTCString()}</pubDate>
+			<guid>${site.url}/projects/${meta.slug}</guid>${Number.isNaN(pubDate.getTime()) ? '' : `\n\t\t\t<pubDate>${pubDate.toUTCString()}</pubDate>`}
 			<description>${escapeXml(meta.description)}</description>
 			<content:encoded>${cdata(contentHtml)}</content:encoded>
 		</item>`;

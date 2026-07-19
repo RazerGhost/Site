@@ -39,6 +39,11 @@ export const actions: Actions = {
 		if (!title || !date) {
 			return fail(400, { title, date, tags, cover, excerpt, series, draft, body, error: 'Title and date are required.' });
 		}
+		// The date is embedded in the filename slug — anything but YYYY-MM-DD
+		// would make writeEntry's slug validation throw a 500 instead of this.
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+			return fail(400, { title, date, tags, cover, excerpt, series, draft, body, error: 'Date must be YYYY-MM-DD.' });
+		}
 
 		const newSlug = `${date}-${slugifyHeading(title)}`;
 		if (newSlug !== params.slug) {

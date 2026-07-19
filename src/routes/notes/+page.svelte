@@ -442,6 +442,14 @@
 	}
 
 	async function selectNote(id: number) {
+		// Flush any pending autosave for the outgoing note before the panel
+		// fields are overwritten — otherwise the debounce timer could fire
+		// while the panel already holds the incoming note's content (writing
+		// it to the wrong note), or the last edit would silently be dropped.
+		clearTimeout(autosaveTimer);
+		if (panelDirty && selectedId !== null && selectedId !== id) {
+			await savePanel(selectedId);
+		}
 		selectedId = id;
 		panelError = '';
 		panelMode = 'write';
@@ -469,11 +477,13 @@
 		panelView = 'view';
 	}
 
-	async function savePanel() {
-		if (selectedId === null) return;
+	// Saves the panel's current content to `id` — callers must only pass an
+	// id whose content is actually in the panel (see selectNote's flush).
+	async function savePanel(id: number | null = selectedId) {
+		if (id === null) return;
 		panelSaving = true;
 		const fd = new FormData();
-		fd.set('id', String(selectedId));
+		fd.set('id', String(id));
 		fd.set('title', panelTitle.trim());
 		fd.set('body', panelBody);
 		fd.set('tags', panelTags);
@@ -484,18 +494,20 @@
 			panelError = 'Failed to save.';
 			return;
 		}
-		const node = nodeById.get(selectedId);
+		const node = nodeById.get(id);
 		if (node) {
 			node.title = panelTitle.trim() || 'Untitled';
 			node.tags = panelTags;
 			node.folder = panelFolder;
 		}
-		panelDirty = false;
-		autoLinkWikiRefs(selectedId);
+		if (selectedId === id) panelDirty = false;
+		autoLinkWikiRefs(id);
 	}
 
 	// Debounced autosave: fires ~900ms after the last edit while dirty. The
-	// explicit Save button still works for an immediate save.
+	// explicit Save button still works for an immediate save. The note id is
+	// captured at schedule time so a fire after a note switch can never write
+	// to the newly-selected note.
 	let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
 		void panelTitle;
@@ -503,8 +515,9 @@
 		void panelTags;
 		void panelFolder;
 		if (!panelDirty || selectedId === null) return;
+		const id = selectedId;
 		clearTimeout(autosaveTimer);
-		autosaveTimer = setTimeout(() => savePanel(), 900);
+		autosaveTimer = setTimeout(() => savePanel(id), 900);
 		return () => clearTimeout(autosaveTimer);
 	});
 
@@ -527,7 +540,12 @@
 		};
 		const fd = new FormData();
 		fd.set('id', String(id));
-		await fetch('/notes?/delete', { method: 'POST', body: fd });
+		const res = await fetch('/notes?/delete', { method: 'POST', body: fd });
+		if (!res.ok) {
+			panelError = 'Failed to delete.';
+			deletedSnapshot = null;
+			return;
+		}
 		nodes = nodes.filter((n) => n.id !== id);
 		links = links.filter((l) => l.source_id !== id && l.target_id !== id);
 		closePanel();
@@ -1975,7 +1993,7 @@
 					<div class="flex items-center justify-between border-t border-border pt-3">
 						<button
 							type="button"
-							onclick={savePanel}
+							onclick={() => savePanel()}
 							disabled={!panelDirty}
 							class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
 						>

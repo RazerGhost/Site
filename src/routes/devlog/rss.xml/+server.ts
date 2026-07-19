@@ -16,13 +16,15 @@ export const GET: RequestHandler = () => {
 			const entry = getDevlogEntry(meta.slug);
 			const imageUrl = resolveUrl(meta.cover ?? `/devlog/${meta.slug}/og.png`);
 			const contentHtml = entry ? `<img src="${imageUrl}" alt="" />${entry.html}` : escapeXml(meta.excerpt);
+			// Drop <pubDate> for an unparseable date rather than emitting the
+			// literal string "Invalid Date" into the feed.
+			const pubDate = new Date(meta.date);
 
 			return `
 		<item>
 			<title>${escapeXml(meta.title)}</title>
 			<link>${site.url}/devlog/${meta.slug}</link>
-			<guid>${site.url}/devlog/${meta.slug}</guid>
-			<pubDate>${new Date(meta.date).toUTCString()}</pubDate>
+			<guid>${site.url}/devlog/${meta.slug}</guid>${Number.isNaN(pubDate.getTime()) ? '' : `\n\t\t\t<pubDate>${pubDate.toUTCString()}</pubDate>`}
 			<description>${escapeXml(meta.excerpt)}</description>
 			<content:encoded>${cdata(contentHtml)}</content:encoded>
 		</item>`;
