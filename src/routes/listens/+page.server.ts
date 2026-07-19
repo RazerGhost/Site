@@ -4,10 +4,13 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = ({ url }) => {
 	const years = getAvailableYears();
 	const yearParam = url.searchParams.get('year');
-	const year = yearParam && years.includes(Number(yearParam)) ? Number(yearParam) : null;
+	const explicitYear = yearParam && years.includes(Number(yearParam)) ? Number(yearParam) : null;
+	// "all" is a real, explicit choice — only fall back to the latest year when
+	// there's no year param in the URL at all (first load).
+	const year = yearParam ? explicitYear : (years[0] ?? null);
 
 	const stats = getListeningStats(year != null ? { year } : {});
-	const heatmap = year != null ? getHeatmap(year) : years[0] != null ? getHeatmap(years[0]) : [];
+	const heatmap = year != null ? getHeatmap(year) : [];
 	const hourly = getHourlyBreakdown();
 
 	const today = new Date();
@@ -20,7 +23,7 @@ export const load: PageServerLoad = ({ url }) => {
 		// second, unfiltered getListeningStats() pass just for this flag.
 		configured: years.length > 0,
 		years,
-		selectedYear: year ?? years[0] ?? null,
+		selectedYear: year,
 		heatmap,
 		hourly,
 		onThisDay
