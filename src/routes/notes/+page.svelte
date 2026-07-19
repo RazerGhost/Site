@@ -449,6 +449,11 @@
 		clearTimeout(autosaveTimer);
 		if (panelDirty && selectedId !== null && selectedId !== id) {
 			await savePanel(selectedId);
+			if (panelDirty) {
+				// Flush failed — stay on the outgoing note so the unsaved edit
+				// and panelError are visible instead of being silently dropped.
+				return;
+			}
 		}
 		selectedId = id;
 		panelError = '';

@@ -1,4 +1,4 @@
-import { getLibraryWithFallback, simklConfigured } from './simkl';
+import { refreshLibrarySnapshot, simklConfigured } from './simkl';
 
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
@@ -16,7 +16,10 @@ export function startSimklRefreshLoop(): void {
 	g[STARTED_KEY] = true;
 
 	const run = () => {
-		getLibraryWithFallback().catch((err) => {
+		// Bypasses getLibraryWithFallback's 15-min freshness gate — this loop
+		// is the thing keeping the snapshot fresh, so it must always hit Simkl
+		// live rather than short-circuit on its own recent snapshot.
+		refreshLibrarySnapshot().catch((err) => {
 			console.error('Simkl background refresh failed:', err);
 		});
 	};
