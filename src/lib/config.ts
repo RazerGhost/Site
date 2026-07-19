@@ -16,7 +16,9 @@ export const site = {
     "425729668482859008"
 };
 
-export const socialLinks = [
+type SocialIcon = "github" | "linkedin" | "mail";
+
+export const socialLinks: { label: string; href: string; icon: SocialIcon }[] = [
   {
     label: "GitHub",
     href: "https://github.com/RazerGhost",
