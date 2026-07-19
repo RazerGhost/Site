@@ -7,6 +7,38 @@ import matter from 'gray-matter';
 // differ in output shape (devlog has series/searchText/footnotes;
 // projects has name/href/live), so only the identical file-reading and
 // date-normalization bits live here, not a forced full unification.
+// Content filenames are always `<slug>.md` with slugs matching this shape
+// (devlog: `YYYY-MM-DD-title`, projects: plain kebab-case). Validating URL
+// params against it before any path.join keeps traversal sequences out of
+// filesystem paths, independent of how the router happens to decode them.
+const SLUG_RE = /^[a-z0-9-]+$/;
+
+export function isValidSlug(slug: string): boolean {
+	return SLUG_RE.test(slug);
+}
+
+// Cheap change-detection key for a content directory: the sorted list of
+// markdown filenames + mtimes. Reading/parsing every post on every request
+// (the root layout does this for the command palette) is wasted work when
+// nothing changed — callers cache their parsed output keyed on this and only
+// re-read when a file is added, removed, or touched.
+export function contentDirSignature(contentDir: string): string {
+	if (!fs.existsSync(contentDir)) return '';
+	return fs
+		.readdirSync(contentDir)
+		.filter((f) => f.endsWith('.md'))
+		.sort()
+		.map((f) => {
+			try {
+				return `${f}:${fs.statSync(path.join(contentDir, f)).mtimeMs}`;
+			} catch {
+				// File deleted between readdir and stat — still changes the signature.
+				return `${f}:gone`;
+			}
+		})
+		.join('|');
+}
+
 export function readEntryFile(contentDir: string, filename: string) {
 	const raw = fs.readFileSync(path.join(contentDir, filename), 'utf-8');
 	const { data, content } = matter(raw);

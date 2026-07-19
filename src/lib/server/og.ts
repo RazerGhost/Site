@@ -105,7 +105,9 @@ export async function renderOgImage({ title, tags, eyebrow }: OgImageOptions): P
 						style: {
 							display: 'flex',
 							fontSize: title.length > 60 ? '52px' : '64px',
-							fontWeight: 800,
+							// 700 is the heaviest face actually loaded (loadFonts above)
+							// — asking for more makes satori silently fall back anyway.
+							fontWeight: 700,
 							color: '#ffffff',
 							lineHeight: 1.15,
 							letterSpacing: '-1.5px'

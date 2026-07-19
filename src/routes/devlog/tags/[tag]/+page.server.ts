@@ -6,7 +6,8 @@ export const load: PageServerLoad = ({ params }) => {
 
 	return {
 		tag: params.tag,
-		entries: allEntries.filter((e) => e.tags.includes(params.tag)),
+		// Newest first for display — getAllDevlogEntries() itself is oldest-first.
+		entries: allEntries.filter((e) => e.tags.includes(params.tag)).toReversed(),
 		allTags: [...new Set(allEntries.flatMap((e) => e.tags))].sort()
 	};
 };

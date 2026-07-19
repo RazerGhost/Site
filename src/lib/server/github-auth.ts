@@ -26,7 +26,8 @@ export async function exchangeCodeForToken(code: string, redirectUri: string): P
 			client_secret: env.GITHUB_CLIENT_SECRET ?? '',
 			code,
 			redirect_uri: redirectUri
-		})
+		}),
+		signal: AbortSignal.timeout(10_000)
 	});
 
 	if (!res.ok) throw new Error(`GitHub token exchange failed: ${res.status}`);
@@ -42,7 +43,8 @@ export async function fetchGithubUser(accessToken: string): Promise<{ id: number
 			Authorization: `Bearer ${accessToken}`,
 			// GitHub's API rejects unauthenticated-looking requests without one.
 			'User-Agent': 'ghostbase'
-		}
+		},
+		signal: AbortSignal.timeout(10_000)
 	});
 
 	if (!res.ok) throw new Error(`GitHub user fetch failed: ${res.status}`);

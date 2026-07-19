@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
 	return {
-		entries: getAllDevlogEntries()
+		// Newest first for display — getAllDevlogEntries() itself is oldest-first.
+		entries: getAllDevlogEntries().toReversed()
 	};
 };

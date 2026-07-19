@@ -5,6 +5,8 @@ import {
 	readEntryFile,
 	toDateString,
 	addHeadingAnchors,
+	isValidSlug,
+	contentDirSignature,
 	type TocEntry
 } from './content';
 
@@ -121,16 +123,31 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 	};
 }
 
+// Sorted oldest-first — prev/next and series math in devlog/[slug]'s load
+// relies on ascending order, so display consumers (homepage "Latest", the
+// /devlog list, RSS) must .toReversed() for newest-first themselves.
+//
 // Drafts (`draft: true` in frontmatter) are excluded here — this is what
 // backs the list page, RSS, sitemap, tag pages, and prev/next/related
 // computations, so leaving them out of this function keeps them unpublished
 // everywhere at once. getDevlogEntry() below deliberately does NOT filter,
 // so a draft is still viewable by anyone who has its direct URL — useful
 // for previewing a post before it goes live.
+// Parsed results are cached per server process and invalidated by file
+// mtimes (see contentDirSignature) — editing a post on disk (by hand or via
+// /notes/devlog) still takes effect on the next request, but unchanged
+// content no longer costs a full re-read + re-parse of every file per
+// request. Callers must not mutate the returned arrays/objects.
+let listCache: { signature: string; entries: DevlogMeta[] } | null = null;
+const entryCache = new Map<string, { mtimeMs: number; entry: DevlogEntry }>();
+
 export function getAllDevlogEntries(): DevlogMeta[] {
 	if (!fs.existsSync(CONTENT_DIR)) return [];
 
-	return fs
+	const signature = contentDirSignature(CONTENT_DIR);
+	if (listCache && listCache.signature === signature) return listCache.entries;
+
+	const entries = fs
 		.readdirSync(CONTENT_DIR)
 		.filter((f) => f.endsWith('.md'))
 		.map((filename) => {
@@ -139,11 +156,25 @@ export function getAllDevlogEntries(): DevlogMeta[] {
 		})
 		.filter((entry) => !entry.draft)
 		.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : a.slug.localeCompare(b.slug)));
+
+	listCache = { signature, entries };
+	return entries;
 }
 
 export function getDevlogEntry(slug: string): DevlogEntry | null {
+	if (!isValidSlug(slug)) return null;
 	const filename = `${slug}.md`;
-	if (!fs.existsSync(path.join(CONTENT_DIR, filename))) return null;
+
+	let mtimeMs: number;
+	try {
+		mtimeMs = fs.statSync(path.join(CONTENT_DIR, filename)).mtimeMs;
+	} catch {
+		entryCache.delete(slug);
+		return null;
+	}
+
+	const cached = entryCache.get(slug);
+	if (cached && cached.mtimeMs === mtimeMs) return cached.entry;
 
 	const { meta, body } = readEntryFile(CONTENT_DIR, filename);
 	const { body: bodyWithFootnoteRefs, footnotes } = applyFootnotes(body);
@@ -151,5 +182,7 @@ export function getDevlogEntry(slug: string): DevlogEntry | null {
 	const { html: htmlWithAnchors, toc } = addHeadingAnchors(rawHtml);
 	const html = footnotes.length ? htmlWithAnchors + renderFootnotesSection(footnotes) : htmlWithAnchors;
 
-	return { ...toMeta(slug, meta, body), html, toc };
+	const entry = { ...toMeta(slug, meta, body), html, toc };
+	entryCache.set(slug, { mtimeMs, entry });
+	return entry;
 }

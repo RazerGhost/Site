@@ -109,6 +109,16 @@ describe('search', () => {
 		deleteNote(note.id);
 		expect(searchNotes('pasta')).toEqual([]);
 	});
+
+	it('does not duplicate the search index when a soft-deleted note is edited then restored', () => {
+		const note = createNote({ title: 'Recipe', body: 'A great pasta dish' });
+		deleteNote(note.id);
+		// e.g. restoreRevision or a stale editor tab writing to a deleted note —
+		// it isn't in the FTS index at this point, so this must not re-index it.
+		updateNote(note.id, { title: 'Recipe', body: 'An even better pasta dish' });
+		undoDeleteNote(note.id);
+		expect(searchNotes('pasta').map((n) => n.id)).toEqual([note.id]);
+	});
 });
 
 describe('revisions', () => {

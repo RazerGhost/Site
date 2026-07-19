@@ -16,19 +16,25 @@ import type { RequestHandler } from './$types';
 // polling more often than necessary, or overlapping the next export's
 // range, is safe.
 //
-// Gated by SPOTIFY_SCROBBLE_SECRET (?secret= query param) since this
-// endpoint has a side effect (writes to the DB) and would otherwise be
-// publicly triggerable.
-export const GET: RequestHandler = async ({ url }) => {
+// Gated by SPOTIFY_SCROBBLE_SECRET since this endpoint has a side effect
+// (writes to the DB) and would otherwise be publicly triggerable. Prefer the
+// `Authorization: Bearer <secret>` header — query strings end up in
+// proxy/access logs. `?secret=` is still accepted so existing cron entries
+// keep working.
+export const GET: RequestHandler = async ({ url, request }) => {
 	const secret = env.SPOTIFY_SCROBBLE_SECRET;
 	if (!secret) error(503, 'Scrobbling not configured');
-	if (url.searchParams.get('secret') !== secret) error(401, 'Unauthorized');
+	const provided =
+		request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
+		url.searchParams.get('secret');
+	if (provided !== secret) error(401, 'Unauthorized');
 
 	if (!spotifyConfigured()) error(503, 'Spotify not configured');
 
 	const accessToken = await getSpotifyAccessToken();
 	const res = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
-		headers: { Authorization: `Bearer ${accessToken}` }
+		headers: { Authorization: `Bearer ${accessToken}` },
+		signal: AbortSignal.timeout(10_000)
 	});
 
 	if (res.status === 403) error(403, 'Missing user-read-recently-played scope');

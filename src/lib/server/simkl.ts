@@ -76,7 +76,8 @@ async function fetchAll(type: SimklType): Promise<{ status: string; item: Librar
 		headers: {
 			Authorization: `Bearer ${env.SIMKL_ACCESS_TOKEN}`,
 			'User-Agent': `${APP_NAME}/${APP_VERSION}`
-		}
+		},
+		signal: AbortSignal.timeout(10_000)
 	});
 
 	if (!res.ok) throw new Error(`Simkl ${type} fetch failed: ${res.status}`);
@@ -84,9 +85,11 @@ async function fetchAll(type: SimklType): Promise<{ status: string; item: Librar
 	const data = await res.json();
 	const entries: AllItemsEntry[] = data[type] ?? [];
 
-	return entries.map((entry) => {
+	// One malformed entry (missing both show and movie) shouldn't sink the
+	// whole library fetch — skip it and keep the rest.
+	return entries.flatMap((entry) => {
 		const media = entry.show ?? entry.movie;
-		if (!media) throw new Error(`Simkl ${type} entry missing both show and movie`);
+		if (!media) return [];
 		return {
 			status: entry.status,
 			item: {
@@ -147,7 +150,8 @@ async function fetchDetail(
 ): Promise<{ genres: string[]; overview: string; runtime: number | null } | null> {
 	const params = new URLSearchParams({ client_id: env.SIMKL_CLIENT_ID ?? '', extended: 'full' });
 	const res = await fetch(`https://api.simkl.com/${SIMKL_PATH[type]}/${simklId}?${params}`, {
-		headers: { 'User-Agent': `${APP_NAME}/${APP_VERSION}` }
+		headers: { 'User-Agent': `${APP_NAME}/${APP_VERSION}` },
+		signal: AbortSignal.timeout(10_000)
 	});
 	if (!res.ok) return null;
 

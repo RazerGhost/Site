@@ -1,4 +1,4 @@
-import { insertPlays, getListeningStats, deleteScrobbledRange } from './spotify-history-db';
+import { importRecords } from './spotify-history-db';
 import type { PlayRecord } from './spotify-history-db';
 
 export type { ListeningStats, TrackHistory, SearchResult } from './spotify-history-db';
@@ -32,12 +32,18 @@ function parseEntries(raw: unknown): PlayRecord[] {
 		if (!entry || typeof entry !== 'object') continue;
 		const e = entry as Record<string, unknown>;
 
-		const playedAtRaw = (e.ts ?? e.endTime) as string | undefined;
-		const msPlayed = (e.ms_played ?? e.msPlayed) as number | undefined;
-		const track = (e.master_metadata_track_name ?? e.trackName) as string | null | undefined;
-		const artist = (e.master_metadata_album_artist_name ?? e.artistName) as string | null | undefined;
+		// Real typeof checks, not just casts — a malformed entry (e.g. a string
+		// ms_played) would otherwise slip through truthiness and get coerced
+		// into the INTEGER column by SQLite.
+		const playedAtRaw = e.ts ?? e.endTime;
+		const msPlayed = e.ms_played ?? e.msPlayed;
+		const track = e.master_metadata_track_name ?? e.trackName;
+		const artist = e.master_metadata_album_artist_name ?? e.artistName;
 
-		if (!playedAtRaw || !track || !artist || !msPlayed || msPlayed <= 0) continue;
+		if (typeof playedAtRaw !== 'string' || !playedAtRaw) continue;
+		if (typeof msPlayed !== 'number' || msPlayed <= 0) continue;
+		if (typeof track !== 'string' || !track) continue;
+		if (typeof artist !== 'string' || !artist) continue;
 
 		const playedAt = new Date(playedAtRaw);
 		if (Number.isNaN(playedAt.getTime())) continue;
@@ -47,9 +53,9 @@ function parseEntries(raw: unknown): PlayRecord[] {
 			msPlayed,
 			track,
 			artist,
-			album: (e.master_metadata_album_album_name as string | null | undefined) ?? null,
-			spotifyUri: (e.spotify_track_uri as string | null | undefined) ?? null,
-			platform: (e.platform as string | undefined) ?? null,
+			album: typeof e.master_metadata_album_album_name === 'string' ? e.master_metadata_album_album_name : null,
+			spotifyUri: typeof e.spotify_track_uri === 'string' ? e.spotify_track_uri : null,
+			platform: typeof e.platform === 'string' ? e.platform : null,
 			shuffle: typeof e.shuffle === 'boolean' ? e.shuffle : null,
 			skipped: typeof e.skipped === 'boolean' ? e.skipped : null
 		});
@@ -78,16 +84,14 @@ export function importExtendedHistoryFile(rawText: string): ImportResult {
 	}
 
 	// Clear out any live-scrobbled rows (estimated ms_played) this file's date
-	// range now supersedes with real data, before inserting — see
-	// deleteScrobbledRange's docstring for why this has to happen first.
+	// range now supersedes with real data, then insert — one transaction via
+	// importRecords, see deleteScrobbledRange's docstring for the ordering.
 	let minPlayedAt = records[0].playedAt;
 	let maxPlayedAt = records[0].playedAt;
 	for (const r of records) {
 		if (r.playedAt < minPlayedAt) minPlayedAt = r.playedAt;
 		if (r.playedAt > maxPlayedAt) maxPlayedAt = r.playedAt;
 	}
-	const replacedScrobbles = deleteScrobbledRange(minPlayedAt, maxPlayedAt);
-
-	const { inserted } = insertPlays(records);
+	const { inserted, replacedScrobbles } = importRecords(records, minPlayedAt, maxPlayedAt);
 	return { parsed: records.length, inserted, replacedScrobbles, error: null };
 }

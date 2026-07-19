@@ -88,10 +88,17 @@ export type ListeningStats = {
 	topTracks: { track: string; artist: string; plays: number; spotifyUri: string | null }[];
 };
 
+// ISO played_at strings sort lexicographically, so a year filter can be a
+// plain range — unlike strftime('%Y', ...), which SQLite can't answer from
+// idx_plays_played_at and turns into a full-table scan per query.
+function yearRange(year: number): { yearStart: string; yearEnd: string } {
+	return { yearStart: `${year}-01-01`, yearEnd: `${year + 1}-01-01` };
+}
+
 export function getListeningStats(opts: { year?: number } = {}): ListeningStats {
 	const database = getDb();
-	const yearFilter = opts.year != null ? `WHERE strftime('%Y', played_at) = @year` : '';
-	const params = opts.year != null ? { year: String(opts.year) } : {};
+	const yearFilter = opts.year != null ? `WHERE played_at >= @yearStart AND played_at < @yearEnd` : '';
+	const params = opts.year != null ? yearRange(opts.year) : {};
 
 	const totals = database
 		.prepare(
@@ -156,10 +163,10 @@ export function getHeatmap(year: number): { date: string; plays: number }[] {
 	return getDb()
 		.prepare(
 			`SELECT date(played_at) as date, COUNT(*) as plays
-			 FROM plays WHERE strftime('%Y', played_at) = @year
+			 FROM plays WHERE played_at >= @yearStart AND played_at < @yearEnd
 			 GROUP BY date ORDER BY date`
 		)
-		.all({ year: String(year) }) as { date: string; plays: number }[];
+		.all(yearRange(year)) as { date: string; plays: number }[];
 }
 
 // Play counts by hour-of-day (0-23), across all history — powers a listening-clock chart.
@@ -209,6 +216,24 @@ export function deleteScrobbledRange(minPlayedAt: string, maxPlayedAt: string): 
 		)
 		.run({ min: minPlayedAt, max: maxPlayedAt });
 	return result.changes;
+}
+
+// One import = one transaction: clearing superseded live-scrobble rows and
+// inserting the export's records either both land or neither does — a crash
+// in between would otherwise drop scrobbles without their replacement data.
+// (insertPlays' own transaction nests fine — better-sqlite3 turns the inner
+// one into a savepoint on the same connection.)
+export function importRecords(
+	records: PlayRecord[],
+	minPlayedAt: string,
+	maxPlayedAt: string
+): { inserted: number; replacedScrobbles: number } {
+	const run = getDb().transaction(() => {
+		const replacedScrobbles = deleteScrobbledRange(minPlayedAt, maxPlayedAt);
+		const { inserted } = insertPlays(records);
+		return { inserted, replacedScrobbles };
+	});
+	return run();
 }
 
 // Top tracks for one artist — powers the Top Artists drill-down expand.
@@ -267,12 +292,14 @@ export type SearchResult = {
 };
 
 // Simple substring search over track/artist, ranked by play count.
+// LIKE wildcards in the user's query are escaped so searching for a literal
+// "%" or "_" (e.g. the track "100%") matches text, not everything.
 export function searchPlays(query: string): SearchResult[] {
-	const like = `%${query}%`;
+	const like = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
 	return getDb()
 		.prepare(
 			`SELECT track, artist, album, COUNT(*) as plays, spotify_uri as spotifyUri
-			 FROM plays WHERE track LIKE @like OR artist LIKE @like
+			 FROM plays WHERE track LIKE @like ESCAPE '\\' OR artist LIKE @like ESCAPE '\\'
 			 GROUP BY track, artist ORDER BY plays DESC LIMIT 20`
 		)
 		.all({ like }) as SearchResult[];

@@ -6,8 +6,12 @@ export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 type SessionPayload = { sub: string; exp: number };
 
+// Refuses to sign with a missing secret rather than falling back to '' —
+// an empty HMAC key is publicly known, so every token minted or accepted
+// with it would be forgeable.
 function sign(payload: string): string {
-	return createHmac('sha256', env.SESSION_SECRET ?? '').update(payload).digest('base64url');
+	if (!env.SESSION_SECRET) throw new Error('SESSION_SECRET is not set');
+	return createHmac('sha256', env.SESSION_SECRET).update(payload).digest('base64url');
 }
 
 export function createSessionToken(username: string): string {
@@ -18,7 +22,7 @@ export function createSessionToken(username: string): string {
 }
 
 export function verifySessionToken(token: string | undefined | null): { sub: string } | null {
-	if (!token) return null;
+	if (!token || !env.SESSION_SECRET) return null;
 
 	const parts = token.split('.');
 	if (parts.length !== 2) return null;

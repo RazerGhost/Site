@@ -16,7 +16,9 @@ export const load: PageServerLoad = ({ url }) => {
 
 	return {
 		stats,
-		configured: getListeningStats().totalPlays > 0,
+		// Any year with plays means history has been imported — cheaper than a
+		// second, unfiltered getListeningStats() pass just for this flag.
+		configured: years.length > 0,
 		years,
 		selectedYear: year ?? years[0] ?? null,
 		heatmap,

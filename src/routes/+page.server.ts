@@ -19,7 +19,9 @@ export const load: PageServerLoad = async () => {
 	}
 
 	return {
-		latest: getAllDevlogEntries().slice(0, 3),
+		// getAllDevlogEntries() is sorted oldest-first (prev/next math depends
+		// on that) — reverse before slicing so "Latest" means newest.
+		latest: getAllDevlogEntries().toReversed().slice(0, 3),
 		topTrack: listeningStats.topTracks[0] ?? null,
 		totalPlays: listeningStats.totalPlays,
 		watching,

@@ -14,7 +14,8 @@ export const GET: RequestHandler = async () => {
 	try {
 		const accessToken = await getSpotifyAccessToken();
 		const res = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=5', {
-			headers: { Authorization: `Bearer ${accessToken}` }
+			headers: { Authorization: `Bearer ${accessToken}` },
+			signal: AbortSignal.timeout(10_000)
 		});
 
 		if (res.status === 403) {

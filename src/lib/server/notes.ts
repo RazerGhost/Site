@@ -183,22 +183,27 @@ export function createNote(data: {
 	folder?: string;
 }): Note {
 	const now = new Date().toISOString();
-	const result = getDb()
-		.prepare(
-			'INSERT INTO notes (title, body, x, y, tags, folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-		)
-		.run(
-			data.title,
-			data.body,
-			data.x ?? null,
-			data.y ?? null,
-			data.tags ?? '',
-			data.folder ?? '',
-			now,
-			now
-		);
-	const id = result.lastInsertRowid as number;
-	ftsInsert(id, data.title, data.body);
+	// Row + FTS index entry land in one transaction so a crash in between
+	// can't leave a note invisible to search (same pattern in update/delete).
+	const id = getDb().transaction(() => {
+		const result = getDb()
+			.prepare(
+				'INSERT INTO notes (title, body, x, y, tags, folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+			)
+			.run(
+				data.title,
+				data.body,
+				data.x ?? null,
+				data.y ?? null,
+				data.tags ?? '',
+				data.folder ?? '',
+				now,
+				now
+			);
+		const insertedId = result.lastInsertRowid as number;
+		ftsInsert(insertedId, data.title, data.body);
+		return insertedId;
+	})();
 	return getNote(id)!;
 }
 
@@ -273,25 +278,30 @@ export function updateNote(
 	const old = getNoteRaw(id);
 	if (!old) return undefined;
 
-	const contentChanged = old.title !== data.title || old.body !== data.body;
-	if (contentChanged && shouldSnapshot(id)) {
+	getDb().transaction(() => {
+		const contentChanged = old.title !== data.title || old.body !== data.body;
+		if (contentChanged && shouldSnapshot(id)) {
+			getDb()
+				.prepare(
+					'INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (?, ?, ?, ?)'
+				)
+				.run(id, old.title, old.body, old.updated_at);
+		}
+
+		const tags = data.tags ?? old.tags;
+		const folder = data.folder ?? old.folder;
 		getDb()
-			.prepare(
-				'INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (?, ?, ?, ?)'
-			)
-			.run(id, old.title, old.body, old.updated_at);
-	}
+			.prepare('UPDATE notes SET title = ?, body = ?, tags = ?, folder = ?, updated_at = ? WHERE id = ?')
+			.run(data.title, data.body, tags, folder, now, id);
 
-	const tags = data.tags ?? old.tags;
-	const folder = data.folder ?? old.folder;
-	getDb()
-		.prepare('UPDATE notes SET title = ?, body = ?, tags = ?, folder = ?, updated_at = ? WHERE id = ?')
-		.run(data.title, data.body, tags, folder, now, id);
-
-	if (contentChanged) {
-		ftsDelete(id, old.title, old.body);
-		ftsInsert(id, data.title, data.body);
-	}
+		// Soft-deleted notes aren't in the FTS index (deleteNote removed them),
+		// so re-indexing here would create a duplicate FTS row for the same
+		// rowid once undoDeleteNote inserts again — skip until then.
+		if (contentChanged && !old.deleted_at) {
+			ftsDelete(id, old.title, old.body);
+			ftsInsert(id, data.title, data.body);
+		}
+	})();
 
 	return getNote(id);
 }
@@ -321,15 +331,19 @@ export function restoreRevision(revisionId: number): Note | undefined {
 // scale a handful of soft-deleted rows lingering forever costs nothing.
 export function deleteNote(id: number): void {
 	const note = getNoteRaw(id);
-	if (!note) return;
-	getDb().prepare('UPDATE notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
-	ftsDelete(id, note.title, note.body);
+	if (!note || note.deleted_at) return;
+	getDb().transaction(() => {
+		getDb().prepare('UPDATE notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+		ftsDelete(id, note.title, note.body);
+	})();
 }
 
 export function undoDeleteNote(id: number): Note | undefined {
 	const note = getNoteRaw(id);
 	if (!note || !note.deleted_at) return undefined;
-	getDb().prepare('UPDATE notes SET deleted_at = NULL WHERE id = ?').run(id);
-	ftsInsert(id, note.title, note.body);
+	getDb().transaction(() => {
+		getDb().prepare('UPDATE notes SET deleted_at = NULL WHERE id = ?').run(id);
+		ftsInsert(id, note.title, note.body);
+	})();
 	return getNote(id);
 }

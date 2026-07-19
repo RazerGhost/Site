@@ -42,6 +42,11 @@ RUN pnpm prune --prod \
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# adapter-node's default request body limit is 512kb, which rejects the
+# multi-MB JSON uploads at /spotify-import (and 8MB note attachments) with a
+# 413. Baked in here so a deploy works without remembering a Coolify env var;
+# still overridable via Coolify's environment UI (see .env.example).
+ENV BODY_SIZE_LIMIT=200M
 
 COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules

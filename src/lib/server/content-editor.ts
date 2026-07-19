@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import { isValidSlug } from './content';
 
 // Local-dev-only write helpers for the frontmatter markdown files that back
 // devlog and projects (see devlog.ts / projects.ts / content.ts for the read
@@ -10,11 +11,7 @@ import matter from 'gray-matter';
 // persistent volume, so writing here from a running prod container would be
 // lost on the next deploy; this is intentionally not wired up for that.
 
-const SLUG_RE = /^[a-z0-9-]+$/;
-
-export function isValidSlug(slug: string): boolean {
-	return SLUG_RE.test(slug);
-}
+export { isValidSlug };
 
 export interface RawEntry {
 	slug: string;
@@ -35,6 +32,7 @@ export function listRawEntries(contentDir: string): RawEntry[] {
 }
 
 export function getRawEntry(contentDir: string, slug: string): RawEntry | null {
+	if (!isValidSlug(slug)) return null;
 	const file = path.join(contentDir, `${slug}.md`);
 	if (!fs.existsSync(file)) return null;
 	const raw = fs.readFileSync(file, 'utf-8');

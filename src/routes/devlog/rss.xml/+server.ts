@@ -8,7 +8,8 @@ function resolveUrl(src: string): string {
 }
 
 export const GET: RequestHandler = () => {
-	const entries = getAllDevlogEntries();
+	// RSS convention is newest item first — getAllDevlogEntries() is oldest-first.
+	const entries = getAllDevlogEntries().toReversed();
 
 	const items = entries
 		.map((meta) => {

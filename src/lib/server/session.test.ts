@@ -43,6 +43,20 @@ describe('createSessionToken / verifySessionToken', () => {
 		expect(verifySessionToken(token)).toBeNull();
 	});
 
+	it('refuses to mint or accept tokens while SESSION_SECRET is unset', () => {
+		const token = createSessionToken('RazerGhost');
+		const secret = env.SESSION_SECRET;
+		try {
+			// '' is treated the same as unset by session.ts's !env.SESSION_SECRET
+			// checks (and assigning beats `delete` on the non-optional env type).
+			env.SESSION_SECRET = '';
+			expect(() => createSessionToken('RazerGhost')).toThrow();
+			expect(verifySessionToken(token)).toBeNull();
+		} finally {
+			env.SESSION_SECRET = secret;
+		}
+	});
+
 	it.each([undefined, null, '', 'not-a-token', 'a.b.c', 'a.'])(
 		'returns null for malformed input %p without throwing',
 		(input) => {
