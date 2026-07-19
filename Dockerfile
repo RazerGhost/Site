@@ -42,6 +42,15 @@ RUN pnpm prune --prod \
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+
+# git is needed by src/routes/api/backup — it shells out to clone/commit/push
+# the data/ SQLite dumps to a private backup repo. ca-certificates is
+# required separately from whatever Node bundles, since git's own HTTPS
+# transport uses the system trust store.
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends git ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
+
 # adapter-node's default request body limit is 512kb, which rejects the
 # multi-MB JSON uploads at /spotify-import (and 8MB note attachments) with a
 # 413. Baked in here so a deploy works without remembering a Coolify env var;

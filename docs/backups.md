@@ -1,0 +1,57 @@
+# Backups
+
+A Coolify persistent volume ([deployment.md](deployment.md)) protects `data/` across redeploys, but not against the server itself being renewed, rebuilt, or deleted — that requires state living somewhere outside the box entirely. `GET /api/backup` ([+server.ts](../src/routes/api/backup/+server.ts)) does that: it dumps the four `data/` SQLite DBs plus `note-attachments/` and pushes them to a private git repo, on the same "secret-gated endpoint hit by a scheduler" pattern as the Spotify scrobble endpoint ([listens.md](listens.md)).
+
+## Why text dumps, not the raw `.db` files
+
+Committing `notes.db` directly would work, but SQLite's on-disk format is a B-tree — a single row change can rewrite pages scattered across the whole file, so git would store a near-full binary copy on every backup with no useful delta compression, and diffs would be unreadable.
+
+Instead, [backup.ts](../src/lib/server/backup.ts) dumps each DB to plain-text SQL — schema (`CREATE TABLE`/`INDEX`/`TRIGGER`) followed by one `INSERT` statement per row, the same shape `sqlite3 <file> .dump` produces. Text diffs cleanly (an edited note shows up as one changed `INSERT` line) and git's delta compression handles the repetition across snapshots well.
+
+To restore a table from a dump: `sqlite3 new.db < notes.sql`.
+
+### FTS5 shadow tables are deliberately skipped
+
+`notes.db` has an external-content FTS5 index (`notes_fts`, from [notes.ts](../src/lib/server/notes.ts)) backing `/notes` search. FTS5 manages its own internal "shadow" tables (`notes_fts_data`, `notes_fts_idx`, `notes_fts_docsize`, `notes_fts_config`) — SQLite refuses direct `INSERT`s into these (`object name reserved for internal use`), and they're recreated automatically as a side effect of `CREATE VIRTUAL TABLE notes_fts`.
+
+`backup.ts` queries `pragma_table_list()` to tell real tables apart from `shadow` and `virtual` ones, and skips dumping row data for both — shadow tables because writing to them directly is illegal, and the virtual table itself because it holds no independent data (it indexes `notes`, via `content='notes'`). This is safe because `notes.ts`'s `openDb()` already re-backfills `notes_fts` from the `notes` table on every startup (`INSERT INTO notes_fts(...) SELECT ... WHERE id NOT IN (SELECT rowid FROM notes_fts)`) — so restoring `notes.sql` into a fresh DB and starting the app rebuilds the search index automatically, with no explicit step needed in the backup/restore flow.
+
+## Endpoint behavior ([+server.ts](../src/routes/api/backup/+server.ts))
+
+On `GET /api/backup` with a valid secret:
+
+1. Shallow-clones `BACKUP_GIT_REMOTE` (branch `BACKUP_GIT_BRANCH`, default `main`) into a temp directory. If the branch doesn't exist yet (first run against a freshly created empty repo), falls back to cloning the repo and creating an orphan branch.
+2. Dumps each of the four DBs (skipping any that don't exist yet, e.g. `status.db` before `/notes/status` has ever been used) to `<name>.sql` in the checkout.
+3. Mirrors `note-attachments/` into the checkout (deletes and re-copies, so deleted attachments drop out of the backup too).
+4. `git add -A`; if nothing changed since the last run, returns early without committing.
+5. Otherwise commits (author identity from `BACKUP_GIT_USER_NAME`/`BACKUP_GIT_USER_EMAIL`, both optional) and pushes.
+6. Deletes the temp directory in a `finally` block regardless of outcome.
+
+Gated the same way as the scrobble endpoint: prefer `Authorization: Bearer <BACKUP_SECRET>` over `?secret=`, since query strings tend to end up in proxy/access logs. Returns `503` if `BACKUP_SECRET` or `BACKUP_GIT_REMOTE` is unset.
+
+## One-time setup
+
+1. **Create a private repo** to hold the backups (e.g. `ghostbase-backups`) — separate from this app's own repo, since it'll accumulate a commit per backup run indefinitely.
+2. **Mint a GitHub PAT** scoped as narrowly as possible: a *fine-grained* token, restricted to just that one repo, with **Contents: Read and write** permission only. A classic PAT or a token with broader scope also works but is unnecessary risk.
+   1. Go to https://github.com/settings/personal-access-tokens and click **Generate new token**.
+   2. Set **Resource owner** to your account.
+   3. Under **Repository access**, choose **Only select repositories** and pick just `ghostbase-backups` — not "All repositories".
+   4. Under **Permissions → Repository permissions**, set **Contents** to **Read and write**. Leave every other permission at "No access".
+   5. Generate it and copy the token (`github_pat_...`) immediately — GitHub only shows it once.
+3. **Set env vars** in Coolify's environment UI (never in a committed `.env`):
+   - `BACKUP_SECRET` — any random string, e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   - `BACKUP_GIT_REMOTE` — `https://x-access-token:<PAT>@github.com/you/ghostbase-backups.git`
+   - Optionally `BACKUP_GIT_BRANCH`, `BACKUP_GIT_USER_NAME`, `BACKUP_GIT_USER_EMAIL` (all have sane defaults — see [.env.example](../.env.example))
+4. **Schedule it**: Coolify's **Scheduled Tasks** (or an external cron / GitHub Actions cron hitting the deployed URL) running something like:
+   ```
+   curl -fsS -H "Authorization: Bearer $BACKUP_SECRET" https://razerghost.xyz/api/backup
+   ```
+   Nightly is plenty — everything backed up here changes slowly (notes, watch history, listening stats), unlike the scrobble endpoint which needs a tight interval to avoid losing Spotify history.
+
+## Credential exposure notes
+
+The PAT lives in `BACKUP_GIT_REMOTE`, which is:
+- Present in the container's environment for the life of the process (same exposure as every other secret in `.env.example`).
+- Briefly written to `.git/config` inside the temp checkout during a backup run, then deleted along with the rest of the temp directory in the endpoint's `finally` block.
+
+It is **not** persisted anywhere in the app's own repo or the running container's filesystem outside that temp directory's lifetime. Keeping the PAT's scope to a single private repo's contents means a leak of this value can't reach anything else in the GitHub account.

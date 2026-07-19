@@ -9,5 +9,6 @@ In-depth, implementation-level documentation. Start with the top-level [README.m
 - [listens.md](listens.md) — Spotify extended history import, live scrobbling, stats queries
 - [integrations.md](integrations.md) — Spotify "now playing" widget, Discord presence, GitHub activity
 - [deployment.md](deployment.md) — Docker build, Coolify/Traefik, persistent volumes, health checks
+- [backups.md](backups.md) — git-based backup of `data/` to a private repo, SQL text dumps, FTS5 shadow table handling
 
 Each doc assumes you've read the top-level README's environment variable table.
