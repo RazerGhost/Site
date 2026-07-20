@@ -7,6 +7,10 @@ import {
 	addHeadingAnchors,
 	isValidSlug,
 	contentDirSignature,
+	estimateReadingTime,
+	toSearchText,
+	applyFootnotes,
+	renderFootnotesSection,
 	type TocEntry
 } from './content';
 
@@ -31,81 +35,6 @@ export interface DevlogMeta {
 export interface DevlogEntry extends DevlogMeta {
 	html: string;
 	toc: TocEntry[];
-}
-
-const WORDS_PER_MINUTE = 200;
-
-function estimateReadingTime(body: string): number {
-	const words = body.trim().split(/\s+/).filter(Boolean).length;
-	return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
-}
-
-// Strips markdown syntax down to plain, lowercased text so the devlog list
-// page can search post bodies client-side without shipping raw markdown
-// (code fences, link syntax, etc.) into the search match.
-export function toSearchText(body: string): string {
-	return body
-		.replace(/```[\s\S]*?```/g, ' ')
-		.replace(/`([^`]+)`/g, '$1')
-		.replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
-		.replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
-		.replace(/^\[\^[\w-]+]:\s*.+$/gm, ' ')
-		.replace(/\[\^[\w-]+]/g, ' ')
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/[#>*_~-]/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim()
-		.toLowerCase();
-}
-
-interface FootnoteEntry {
-	refId: string;
-	noteId: string;
-	html: string;
-}
-
-// Hand-rolled footnote support ([^label] refs + "[^label]: text" block
-// definitions), run on the raw markdown before marked.parse — same
-// independent-of-marked's-renderer-API approach as addHeadingAnchors below,
-// rather than pulling in a marked plugin for something this small.
-export function applyFootnotes(body: string): { body: string; footnotes: FootnoteEntry[] } {
-	const defs = new Map<string, string>();
-	const withoutDefs = body.replace(/^\[\^([\w-]+)]:\s*(.+)$/gm, (_match, label, text) => {
-		defs.set(label, text);
-		return '';
-	});
-
-	if (defs.size === 0) return { body, footnotes: [] };
-
-	const order: string[] = [];
-	const withRefs = withoutDefs.replace(/\[\^([\w-]+)]/g, (match, label) => {
-		if (!defs.has(label)) return match;
-		let index = order.indexOf(label);
-		if (index === -1) {
-			order.push(label);
-			index = order.length - 1;
-		}
-		const n = index + 1;
-		return `<sup id="fnref-${n}"><a href="#fn-${n}" class="footnote-ref">${n}</a></sup>`;
-	});
-
-	const footnotes = order.map((label, i) => {
-		const n = i + 1;
-		return {
-			refId: `fnref-${n}`,
-			noteId: `fn-${n}`,
-			html: marked.parseInline(defs.get(label) ?? '', { async: false }) as string
-		};
-	});
-
-	return { body: withRefs, footnotes };
-}
-
-function renderFootnotesSection(footnotes: FootnoteEntry[]): string {
-	const items = footnotes
-		.map((f) => `<li id="${f.noteId}">${f.html} <a href="#${f.refId}" class="footnote-backref">↩</a></li>`)
-		.join('');
-	return `<section class="footnotes"><hr />\n<ol>${items}</ol></section>`;
 }
 
 function toMeta(slug: string, meta: Record<string, unknown>, body: string): DevlogMeta {

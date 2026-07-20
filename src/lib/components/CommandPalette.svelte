@@ -4,7 +4,9 @@
 	import { navLinks } from '$lib/config';
 	import Search from '@lucide/svelte/icons/search';
 
-	let { entries }: { entries: { slug: string; title: string }[] } = $props();
+	let {
+		entries
+	}: { entries: { slug: string; title: string; kind: 'devlog' | 'project' }[] } = $props();
 
 	interface Item {
 		label: string;
@@ -48,11 +50,11 @@
 			const extra = fullIndex[entry.slug];
 			return {
 				label: entry.title,
-				hint: 'Devlog',
+				hint: entry.kind === 'project' ? 'Project' : 'Devlog',
 				search: extra
 					? `${entry.title} ${extra.excerpt} ${extra.searchText}`.toLowerCase()
 					: entry.title.toLowerCase(),
-				action: () => goto(`/devlog/${entry.slug}`)
+				action: () => goto(`/${entry.kind === 'project' ? 'projects' : 'devlog'}/${entry.slug}`)
 			};
 		})
 	);

@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getAllProjects, getProject } from '$lib/server/projects';
+import { getAllDevlogEntries } from '$lib/server/devlog';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
@@ -24,5 +25,12 @@ export const load: PageServerLoad = ({ params }) => {
 		.slice(0, 3)
 		.map((p) => p.project);
 
-	return { project, older, newer, related };
+	const relatedPosts = getAllDevlogEntries()
+		.map((post) => ({ post, shared: post.tags.filter((tag) => project.tags.includes(tag)).length }))
+		.filter((p) => p.shared > 0)
+		.sort((a, b) => b.shared - a.shared || (a.post.date > b.post.date ? -1 : 1))
+		.slice(0, 5)
+		.map((p) => p.post);
+
+	return { project, older, newer, related, relatedPosts };
 };

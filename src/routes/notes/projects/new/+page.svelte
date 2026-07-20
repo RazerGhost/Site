@@ -76,11 +76,48 @@
 
 		<input
 			type="text"
+			name="stack"
+			placeholder="Tech stack (comma separated, optional)"
+			value={form?.stack ?? ''}
+			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+		/>
+
+		<input
+			type="text"
 			name="cover"
 			placeholder="Cover image path (optional)"
 			value={form?.cover ?? ''}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
+
+		<input
+			type="text"
+			name="images"
+			placeholder="Gallery image paths (comma separated, optional)"
+			value={form?.images ?? ''}
+			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+		/>
+
+		<div class="flex items-center gap-4">
+			<select
+				name="status"
+				value={form?.status ?? 'active'}
+				class="rounded-lg border border-border bg-transparent px-4 py-2 text-white focus:border-primary focus:outline-none"
+			>
+				<option value="active">Active</option>
+				<option value="paused">Paused</option>
+				<option value="archived">Archived</option>
+			</select>
+			<label class="flex items-center gap-2 text-sm text-gray">
+				<input type="checkbox" name="featured" checked={form?.featured ?? false} />
+				Featured
+			</label>
+		</div>
+
+		<label class="flex items-center gap-2 text-sm text-gray">
+			<input type="checkbox" name="draft" checked={form?.draft ?? false} class="accent-primary" />
+			Draft (hidden from public list, RSS, sitemap — viewable via direct link)
+		</label>
 
 		<div class="flex gap-1 text-xs">
 			<button

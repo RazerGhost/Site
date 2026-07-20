@@ -18,6 +18,11 @@ export const load: PageServerLoad = ({ params }) => {
 		live: entry.meta.live ? String(entry.meta.live) : '',
 		cover: entry.meta.cover ? String(entry.meta.cover) : '',
 		tags: Array.isArray(entry.meta.tags) ? (entry.meta.tags as string[]).join(', ') : '',
+		stack: Array.isArray(entry.meta.stack) ? (entry.meta.stack as string[]).join(', ') : '',
+		images: Array.isArray(entry.meta.images) ? (entry.meta.images as string[]).join(', ') : '',
+		status: entry.meta.status === 'paused' || entry.meta.status === 'archived' ? entry.meta.status : 'active',
+		featured: entry.meta.featured === true,
+		draft: entry.meta.draft === true,
 		date: toDateString(entry.meta.date),
 		body: entry.body
 	};
@@ -33,10 +38,30 @@ export const actions: Actions = {
 		const live = String(data.get('live') ?? '').trim();
 		const cover = String(data.get('cover') ?? '').trim();
 		const tags = String(data.get('tags') ?? '');
+		const stack = String(data.get('stack') ?? '');
+		const images = String(data.get('images') ?? '');
+		const status = String(data.get('status') ?? 'active');
+		const featured = data.get('featured') === 'on';
+		const draft = data.get('draft') === 'on';
 		const body = String(data.get('body') ?? '');
 
 		if (!name || !date) {
-			return fail(400, { name, date, description, href, live, cover, tags, body, error: 'Name and date are required.' });
+			return fail(400, {
+				name,
+				date,
+				description,
+				href,
+				live,
+				cover,
+				tags,
+				stack,
+				images,
+				status,
+				featured,
+				draft,
+				body,
+				error: 'Name and date are required.'
+			});
 		}
 
 		try {
@@ -53,12 +78,38 @@ export const actions: Actions = {
 						.split(',')
 						.map((t) => t.trim())
 						.filter(Boolean),
+					stack: stack
+						.split(',')
+						.map((t) => t.trim())
+						.filter(Boolean),
+					images: images
+						.split(',')
+						.map((t) => t.trim())
+						.filter(Boolean),
+					status,
+					featured,
+					draft,
 					date
 				},
 				body
 			);
 		} catch (e) {
-			return fail(400, { name, date, description, href, live, cover, tags, body, error: (e as Error).message });
+			return fail(400, {
+				name,
+				date,
+				description,
+				href,
+				live,
+				cover,
+				tags,
+				stack,
+				images,
+				status,
+				featured,
+				draft,
+				body,
+				error: (e as Error).message
+			});
 		}
 
 		redirect(303, `/notes/projects/${params.slug}`);

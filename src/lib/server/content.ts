@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import { marked } from 'marked';
 
 // Shared by devlog.ts and projects.ts — both read frontmatter'd markdown
-// off disk the same way. Their toMeta()/getAll()/get() functions genuinely
-// differ in output shape (devlog has series/searchText/footnotes;
-// projects has name/href/live), so only the identical file-reading and
-// date-normalization bits live here, not a forced full unification.
+// off disk the same way, and both estimate reading time, build a search
+// index, render footnotes, and anchor headings identically. Their
+// toMeta()/getAll()/get() functions still genuinely differ in output shape
+// (devlog has series; projects has name/href/live/stack), so only the
+// identical parsing/rendering bits live here, not a forced full unification.
 // Content filenames are always `<slug>.md` with slugs matching this shape
 // (devlog: `YYYY-MM-DD-title`, projects: plain kebab-case). Validating URL
 // params against it before any path.join keeps traversal sequences out of
@@ -89,6 +91,83 @@ export function slugifyHeading(text: string): string {
 // shareable deep links into a post) by post-processing the rendered HTML
 // rather than hooking marked's renderer — keeps this independent of marked's
 // renderer API shape.
+const WORDS_PER_MINUTE = 200;
+
+// Shared by devlog.ts and projects.ts — both estimate reading time and
+// build a searchable plain-text index from a post/project body the same way.
+export function estimateReadingTime(body: string): number {
+	const words = body.trim().split(/\s+/).filter(Boolean).length;
+	return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
+}
+
+// Strips markdown syntax down to plain, lowercased text so list pages can
+// search bodies client-side without shipping raw markdown (code fences,
+// link syntax, etc.) into the search match.
+export function toSearchText(body: string): string {
+	return body
+		.replace(/```[\s\S]*?```/g, ' ')
+		.replace(/`([^`]+)`/g, '$1')
+		.replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+		.replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+		.replace(/^\[\^[\w-]+]:\s*.+$/gm, ' ')
+		.replace(/\[\^[\w-]+]/g, ' ')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/[#>*_~-]/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.toLowerCase();
+}
+
+export interface FootnoteEntry {
+	refId: string;
+	noteId: string;
+	html: string;
+}
+
+// Hand-rolled footnote support ([^label] refs + "[^label]: text" block
+// definitions), run on the raw markdown before marked.parse — same
+// independent-of-marked's-renderer-API approach as addHeadingAnchors below,
+// rather than pulling in a marked plugin for something this small.
+export function applyFootnotes(body: string): { body: string; footnotes: FootnoteEntry[] } {
+	const defs = new Map<string, string>();
+	const withoutDefs = body.replace(/^\[\^([\w-]+)]:\s*(.+)$/gm, (_match, label, text) => {
+		defs.set(label, text);
+		return '';
+	});
+
+	if (defs.size === 0) return { body, footnotes: [] };
+
+	const order: string[] = [];
+	const withRefs = withoutDefs.replace(/\[\^([\w-]+)]/g, (match, label) => {
+		if (!defs.has(label)) return match;
+		let index = order.indexOf(label);
+		if (index === -1) {
+			order.push(label);
+			index = order.length - 1;
+		}
+		const n = index + 1;
+		return `<sup id="fnref-${n}"><a href="#fn-${n}" class="footnote-ref">${n}</a></sup>`;
+	});
+
+	const footnotes = order.map((label, i) => {
+		const n = i + 1;
+		return {
+			refId: `fnref-${n}`,
+			noteId: `fn-${n}`,
+			html: marked.parseInline(defs.get(label) ?? '', { async: false }) as string
+		};
+	});
+
+	return { body: withRefs, footnotes };
+}
+
+export function renderFootnotesSection(footnotes: FootnoteEntry[]): string {
+	const items = footnotes
+		.map((f) => `<li id="${f.noteId}">${f.html} <a href="#${f.refId}" class="footnote-backref">↩</a></li>`)
+		.join('');
+	return `<section class="footnotes"><hr />\n<ol>${items}</ol></section>`;
+}
+
 export function addHeadingAnchors(html: string): { html: string; toc: TocEntry[] } {
 	const toc: TocEntry[] = [];
 	const seen = new Map<string, number>();

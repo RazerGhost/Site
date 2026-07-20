@@ -11,7 +11,8 @@ export const load: PageServerLoad = () => {
 		.map((e) => ({
 			slug: e.slug,
 			name: String(e.meta.name ?? e.slug),
-			date: toDateString(e.meta.date)
+			date: toDateString(e.meta.date),
+			draft: e.meta.draft === true
 		}))
 		.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : a.slug.localeCompare(b.slug)));
 

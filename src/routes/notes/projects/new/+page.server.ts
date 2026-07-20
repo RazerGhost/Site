@@ -16,10 +16,30 @@ export const actions: Actions = {
 		const live = String(data.get('live') ?? '').trim();
 		const cover = String(data.get('cover') ?? '').trim();
 		const tags = String(data.get('tags') ?? '');
+		const stack = String(data.get('stack') ?? '');
+		const images = String(data.get('images') ?? '');
+		const status = String(data.get('status') ?? 'active');
+		const featured = data.get('featured') === 'on';
+		const draft = data.get('draft') === 'on';
 		const body = String(data.get('body') ?? '');
 
 		if (!name || !date) {
-			return fail(400, { name, date, description, href, live, cover, tags, body, error: 'Name and date are required.' });
+			return fail(400, {
+				name,
+				date,
+				description,
+				href,
+				live,
+				cover,
+				tags,
+				stack,
+				images,
+				status,
+				featured,
+				draft,
+				body,
+				error: 'Name and date are required.'
+			});
 		}
 
 		const slug = slugifyHeading(name);
@@ -37,6 +57,17 @@ export const actions: Actions = {
 					.split(',')
 					.map((t) => t.trim())
 					.filter(Boolean),
+				stack: stack
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean),
+				images: images
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean),
+				status,
+				featured,
+				draft,
 				date
 			},
 			body

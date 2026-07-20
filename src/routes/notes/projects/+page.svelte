@@ -29,7 +29,10 @@
 					<a href="/notes/projects/{entry.slug}" class="link truncate font-medium text-white hover:text-primary">
 						{entry.name}
 					</a>
-					<div class="mt-0.5 text-xs text-dim">{entry.date}</div>
+					<div class="mt-0.5 flex items-center gap-2 text-xs text-dim">
+						<span>{entry.date}</span>
+						{#if entry.draft}<span class="rounded-full bg-primary/10 px-2 py-0.5 text-primary">draft</span>{/if}
+					</div>
 				</div>
 				<form
 					method="POST"
