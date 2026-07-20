@@ -15,6 +15,12 @@ export default defineConfig({
 		// Pure string-transform functions (markdown post-processing), not
 		// components — no jsdom/browser environment needed.
 		environment: 'node',
-		include: ['src/**/*.test.ts']
+		include: ['src/**/*.test.ts'],
+		// session.test.ts needs a real SESSION_SECRET to sign/verify tokens;
+		// CI has no .env file, so provide one here rather than relying on the
+		// environment.
+		env: {
+			SESSION_SECRET: 'test-session-secret'
+		}
 	}
 });
