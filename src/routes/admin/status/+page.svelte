@@ -1,11 +1,16 @@
 <script lang="ts">
 	import Seo from '$lib/components/Seo.svelte';
 	import { untrack } from 'svelte';
+	import { enhance } from '$app/forms';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
 	const initialItems = untrack(() => (form?.items ?? data.items.join('\n')) as string);
+
+	let saving = $state(false);
+	let saved = $state(false);
+	let savedTimeout: ReturnType<typeof setTimeout> | undefined;
 </script>
 
 <Seo title="Status editor — RazerGhost" description="Private status editor." path="/admin/status" noindex />
@@ -14,9 +19,27 @@
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit status</h1>
 	<p class="mt-2 text-sm text-dim">Shown in the "Right now" card on the <a href="/" class="link text-primary hover:underline">homepage</a>.</p>
 
-	<form method="POST" class="mt-8 flex flex-col gap-4">
+	<form
+		method="POST"
+		class="mt-8 flex flex-col gap-4"
+		use:enhance={() => {
+			saving = true;
+			return async ({ result, update }) => {
+				await update();
+				saving = false;
+				if (result.type === 'redirect') {
+					saved = true;
+					clearTimeout(savedTimeout);
+					savedTimeout = setTimeout(() => (saved = false), 3000);
+				}
+			};
+		}}
+	>
 		{#if form?.error}
 			<p class="text-sm text-red-400">{form.error}</p>
+		{/if}
+		{#if saved}
+			<p class="text-sm text-primary">Saved.</p>
 		{/if}
 
 		<label class="flex flex-col gap-1 text-sm text-gray">
@@ -45,9 +68,10 @@
 		<div class="flex gap-3">
 			<button
 				type="submit"
-				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+				disabled={saving}
+				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
 			>
-				Save
+				{saving ? 'Saving…' : 'Save'}
 			</button>
 			<a
 				href="/"

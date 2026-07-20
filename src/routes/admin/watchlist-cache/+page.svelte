@@ -11,6 +11,30 @@
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 	}
+
+	let query = $state('');
+	type SortKey = 'title' | 'mediaType' | 'fetchedAt';
+	let sortKey = $state<SortKey>('fetchedAt');
+	let sortDesc = $state(true);
+
+	function toggleSort(key: SortKey) {
+		if (sortKey === key) {
+			sortDesc = !sortDesc;
+		} else {
+			sortKey = key;
+			sortDesc = false;
+		}
+	}
+
+	const filtered = $derived(
+		data.entries
+			.filter((entry) => !query.trim() || entry.title.toLowerCase().includes(query.trim().toLowerCase()))
+			.slice()
+			.sort((a, b) => {
+				const dir = sortDesc ? -1 : 1;
+				return a[sortKey] < b[sortKey] ? -1 * dir : a[sortKey] > b[sortKey] ? 1 * dir : 0;
+			})
+	);
 </script>
 
 <Seo title="Watchlist cache — RazerGhost" description="Private Simkl cache inspector." path="/admin/watchlist-cache" noindex />
@@ -57,22 +81,41 @@
 		{/if}
 	</div>
 
-	<div class="mt-6 overflow-x-auto rounded-lg border border-border">
+	<input
+		type="search"
+		bind:value={query}
+		placeholder="Filter by title…"
+		class="mt-6 w-full rounded-lg border border-border bg-transparent px-4 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none sm:max-w-xs"
+	/>
+
+	<div class="mt-4 overflow-x-auto rounded-lg border border-border">
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-border text-xs text-dim">
 				<tr>
-					<th class="px-4 py-2 font-medium">Title</th>
-					<th class="px-4 py-2 font-medium">Type</th>
+					<th class="sticky left-0 bg-bg px-4 py-2 font-medium">
+						<button type="button" onclick={() => toggleSort('title')} class="link hover:text-white">
+							Title{sortKey === 'title' ? (sortDesc ? ' ↓' : ' ↑') : ''}
+						</button>
+					</th>
+					<th class="px-4 py-2 font-medium">
+						<button type="button" onclick={() => toggleSort('mediaType')} class="link hover:text-white">
+							Type{sortKey === 'mediaType' ? (sortDesc ? ' ↓' : ' ↑') : ''}
+						</button>
+					</th>
 					<th class="px-4 py-2 font-medium">Genres</th>
 					<th class="px-4 py-2 font-medium">Runtime</th>
-					<th class="px-4 py-2 font-medium">Fetched</th>
+					<th class="px-4 py-2 font-medium">
+						<button type="button" onclick={() => toggleSort('fetchedAt')} class="link hover:text-white">
+							Fetched{sortKey === 'fetchedAt' ? (sortDesc ? ' ↓' : ' ↑') : ''}
+						</button>
+					</th>
 					<th class="px-4 py-2 font-medium"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-border">
-				{#each data.entries as entry (entry.simklId + ':' + entry.mediaType)}
+				{#each filtered as entry (entry.simklId + ':' + entry.mediaType)}
 					<tr>
-						<td class="max-w-[16rem] truncate px-4 py-2 text-white">{entry.title}</td>
+						<td class="sticky left-0 max-w-[16rem] truncate bg-bg px-4 py-2 text-white">{entry.title}</td>
 						<td class="px-4 py-2 text-dim">{entry.mediaType}</td>
 						<td class="max-w-[14rem] truncate px-4 py-2 text-dim">{entry.genres.join(', ') || '—'}</td>
 						<td class="px-4 py-2 text-dim">{entry.runtime ? `${entry.runtime}m` : '—'}</td>
@@ -87,7 +130,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-6 text-center text-dim">No cached entries yet.</td>
+						<td colspan="6" class="px-4 py-6 text-center text-dim">No cached entries match.</td>
 					</tr>
 				{/each}
 			</tbody>

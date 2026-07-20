@@ -13,7 +13,8 @@
 <Seo title="Import Spotify history — RazerGhost" description="Private import tool." path="/spotify-import" noindex />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
-	<h1 class="text-3xl font-extrabold tracking-tight text-white">Import Spotify history</h1>
+	<a href="/admin" class="link text-xs text-dim transition-colors hover:text-primary">← Admin</a>
+	<h1 class="mt-2 text-3xl font-extrabold tracking-tight text-white">Import Spotify history</h1>
 
 	<div class="mt-6 grid grid-cols-2 gap-3 rounded-lg border border-border p-4 text-sm sm:grid-cols-4">
 		<div>
