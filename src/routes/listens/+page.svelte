@@ -809,10 +809,10 @@
                 <p class="text-xs font-medium uppercase tracking-wide text-dim">
                     Monthly trend
                 </p>
-                <div class="mt-3 flex h-20 items-end gap-[3px] overflow-x-auto pb-1">
+                <div class="mt-3 flex h-20 items-end gap-[3px] pb-1">
                     {#each monthlyBars as m}
                         <div
-                            class="w-2 shrink-0 rounded-sm bg-primary/70"
+                            class="min-w-[3px] flex-1 rounded-sm bg-primary/70"
                             style:height="{Math.max(
                                 4,
                                 (m.plays / maxMonthly) * 100,
