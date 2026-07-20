@@ -1,7 +1,15 @@
 import { importRecords } from './spotify-history-db';
 import type { PlayRecord } from './spotify-history-db';
 
-export type { ListeningStats, TrackHistory, SearchResult } from './spotify-history-db';
+export type {
+	ListeningStats,
+	TrackHistory,
+	SearchResult,
+	TopAlbum,
+	SkipShuffleStats,
+	MonthlyTrendPoint,
+	Discovery
+} from './spotify-history-db';
 export {
 	getListeningStats,
 	getAvailableYears,
@@ -10,7 +18,12 @@ export {
 	getTrackHistory,
 	searchPlays,
 	getArtistTopTracks,
-	getOnThisDay
+	getOnThisDay,
+	getTopAlbums,
+	getSkipShuffleStats,
+	getMonthlyTrend,
+	getDiscoveries,
+	getActiveDates
 } from './spotify-history-db';
 
 // Spotify's "Extended streaming history" export (requested from

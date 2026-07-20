@@ -7,6 +7,7 @@
     import { reveal } from "$lib/actions/reveal";
     import { goto } from "$app/navigation";
     import { fly } from "svelte/transition";
+    import { albumArt } from "$lib/stores/album-art.svelte";
     import type { PageData } from "./$types";
 
     let { data }: { data: PageData } = $props();
@@ -50,13 +51,22 @@
     const maxTrackPlays = $derived(
         Math.max(1, ...data.stats.topTracks.map((t) => t.plays)),
     );
+    const maxAlbumMs = $derived(
+        Math.max(1, ...data.topAlbums.map((a) => a.msPlayed)),
+    );
 
     function selectYear(e: Event) {
         const value = (e.target as HTMLSelectElement).value;
         const params = new URLSearchParams(location.search);
-        if (value === "all") params.delete("year");
-        else params.set("year", value);
-        goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+        // "all" needs its own explicit value in the URL — deleting the param
+        // entirely would make it indistinguishable from a fresh /listens load
+        // with no selection yet, which the server defaults to the latest year.
+        params.set("year", value);
+        goto(`?${params.toString()}`, {
+            keepFocus: true,
+            noScroll: true,
+            invalidateAll: true,
+        });
     }
 
     // --- Calendar heatmap ---
@@ -96,6 +106,47 @@
         return Array.from({ length: 24 }, (_, hour) => byHour.get(hour) ?? 0);
     });
 
+    // --- Monthly trend ---
+    const MONTH_NAMES = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    function formatMonth(month: string): string {
+        const [y, m] = month.split("-").map(Number);
+        return `${MONTH_NAMES[m - 1]} ${y}`;
+    }
+    const monthlyBars = $derived.by(() => {
+        const byMonth = new Map(data.monthlyTrend.map((m) => [m.month, m]));
+        let months: string[];
+        if (data.selectedYear != null) {
+            months = Array.from(
+                { length: 12 },
+                (_, i) => `${data.selectedYear}-${String(i + 1).padStart(2, "0")}`,
+            );
+        } else {
+            const keys = data.monthlyTrend.map((m) => m.month);
+            if (!keys.length) return [];
+            months = [];
+            let [y, m] = keys[0].split("-").map(Number);
+            const [ly, lm] = keys[keys.length - 1].split("-").map(Number);
+            while (y < ly || (y === ly && m <= lm)) {
+                months.push(`${y}-${String(m).padStart(2, "0")}`);
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+            }
+        }
+        return months.map((month) => ({
+            month,
+            plays: byMonth.get(month)?.plays ?? 0,
+        }));
+    });
+    const maxMonthly = $derived(
+        Math.max(1, ...monthlyBars.map((m) => m.plays)),
+    );
+
     // --- Search ---
     type SearchResult = {
         track: string;
@@ -110,28 +161,6 @@
     let searching = $state(false);
     let searchedFor = $state("");
     let searchTimeout: ReturnType<typeof setTimeout>;
-
-    // Album art isn't in our own DB (only the track/artist/album text is) —
-    // fetch it lazily per result from Spotify's public oEmbed endpoint, which
-    // needs no auth/token. Cached by URI so re-running a search is instant
-    // and we never re-fetch art we already have.
-    let artCache = $state<Record<string, string | null>>({});
-
-    async function fetchArt(uri: string) {
-        if (uri in artCache) return;
-        artCache[uri] = null;
-        try {
-            const trackId = uri.split(":").pop();
-            const res = await fetch(
-                `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`,
-            );
-            if (!res.ok) return;
-            const body = await res.json();
-            if (body.thumbnail_url) artCache[uri] = body.thumbnail_url;
-        } catch {
-            // Art is a nice-to-have — the card still works without it.
-        }
-    }
 
     function onSearchInput() {
         clearTimeout(searchTimeout);
@@ -154,9 +183,6 @@
                 if (q !== query.trim()) return;
                 searchResults = body.results ?? [];
                 searchedFor = q;
-                for (const r of searchResults as SearchResult[]) {
-                    if (r.spotifyUri) fetchArt(r.spotifyUri);
-                }
             } catch {
                 if (q !== query.trim()) return;
                 searchResults = [];
@@ -292,7 +318,7 @@
                 >
                     {#each searchResults as r, i (r.spotifyUri ?? r.track + r.artist)}
                         {@const href = trackHref(r.spotifyUri)}
-                        {@const art = r.spotifyUri ? artCache[r.spotifyUri] : null}
+                        {@const art = albumArt(r.spotifyUri)}
                         <a
                             {href}
                             target={href ? "_blank" : undefined}
@@ -405,6 +431,52 @@
                     </div>
                 </div>
 
+                {#if data.skipShuffle.skipRate != null || data.skipShuffle.shuffleRate != null}
+                    <div
+                        class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center"
+                    >
+                        <div>
+                            <p class="text-xl font-bold text-white">
+                                {data.skipShuffle.skipRate != null
+                                    ? `${Math.round(data.skipShuffle.skipRate)}%`
+                                    : "—"}
+                            </p>
+                            <p class="mt-0.5 text-xs text-dim">Skip rate</p>
+                        </div>
+                        <div>
+                            <p class="text-xl font-bold text-white">
+                                {data.skipShuffle.shuffleRate != null
+                                    ? `${Math.round(data.skipShuffle.shuffleRate)}%`
+                                    : "—"}
+                            </p>
+                            <p class="mt-0.5 text-xs text-dim">Shuffle plays</p>
+                        </div>
+                    </div>
+                {/if}
+
+                {#if data.streaks.longest || data.streaks.current}
+                    <div
+                        class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center"
+                    >
+                        <div>
+                            <p class="text-xl font-bold text-white">
+                                {data.streaks.longest
+                                    ? `${data.streaks.longest.days} day${data.streaks.longest.days === 1 ? "" : "s"}`
+                                    : "—"}
+                            </p>
+                            <p class="mt-0.5 text-xs text-dim">Longest streak</p>
+                        </div>
+                        <div>
+                            <p class="text-xl font-bold text-white">
+                                {data.streaks.current
+                                    ? `${data.streaks.current.days} day${data.streaks.current.days === 1 ? "" : "s"}`
+                                    : "—"}
+                            </p>
+                            <p class="mt-0.5 text-xs text-dim">Current streak</p>
+                        </div>
+                    </div>
+                {/if}
+
                 {#if hourlyByHour.some((n) => n > 0)}
                     <div
                         class="mt-5 flex flex-1 flex-col justify-center border-t border-border pt-5"
@@ -450,33 +522,58 @@
                         </p>
                         <ul class="mt-4 flex flex-col gap-3">
                             {#each data.stats.topArtists as artist}
+                                {@const art = albumArt(artist.spotifyUri)}
                                 <li>
                                     <button
                                         type="button"
-                                        class="w-full text-left"
+                                        class="flex w-full items-center gap-3 text-left"
                                         onclick={() =>
                                             toggleArtist(artist.artist)}
                                     >
                                         <div
-                                            class="flex items-center justify-between text-sm"
+                                            class="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-surface-2"
                                         >
-                                            <span
-                                                class="text-white hover:text-primary"
-                                                >{artist.artist}</span
-                                            >
-                                            <span class="text-dim"
-                                                >{artist.plays} plays</span
-                                            >
+                                            {#if art}
+                                                <img
+                                                    src={art}
+                                                    alt=""
+                                                    class="h-full w-full object-cover"
+                                                />
+                                            {:else}
+                                                <div
+                                                    class="flex h-full w-full items-center justify-center"
+                                                >
+                                                    <Music
+                                                        size={14}
+                                                        class="text-dim"
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                            {/if}
                                         </div>
-                                        <div
-                                            class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"
-                                        >
+                                        <div class="min-w-0 flex-1">
                                             <div
-                                                class="h-full rounded-full bg-primary"
-                                                style="width: {(artist.msPlayed /
-                                                    maxArtistMs) *
-                                                    100}%"
-                                            ></div>
+                                                class="flex items-center justify-between text-sm"
+                                            >
+                                                <span
+                                                    class="truncate text-white hover:text-primary"
+                                                    >{artist.artist}</span
+                                                >
+                                                <span
+                                                    class="ml-3 shrink-0 text-dim"
+                                                    >{artist.plays} plays</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"
+                                            >
+                                                <div
+                                                    class="h-full rounded-full bg-primary"
+                                                    style="width: {(artist.msPlayed /
+                                                        maxArtistMs) *
+                                                        100}%"
+                                                ></div>
+                                            </div>
                                         </div>
                                     </button>
                                     {#if expandedArtist === artist.artist}
@@ -531,49 +628,206 @@
                         <ul class="mt-4 flex flex-col gap-3">
                             {#each data.stats.topTracks as track}
                                 {@const href = trackHref(track.spotifyUri)}
-                                <li>
+                                {@const art = albumArt(track.spotifyUri)}
+                                <li class="flex items-center gap-3">
                                     <div
-                                        class="flex items-center justify-between text-sm"
+                                        class="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-surface-2"
                                     >
-                                        <span
-                                            class="min-w-0 flex-1 truncate text-white"
-                                        >
-                                            {#if href}
-                                                <a
-                                                    {href}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    class="link hover:text-primary"
-                                                    >{track.track}</a
-                                                >
-                                            {:else}
-                                                {track.track}
-                                            {/if}
-                                            <span class="text-dim">
-                                                — {track.artist}</span
+                                        {#if art}
+                                            <img
+                                                src={art}
+                                                alt=""
+                                                class="h-full w-full object-cover"
+                                            />
+                                        {:else}
+                                            <div
+                                                class="flex h-full w-full items-center justify-center"
                                             >
-                                        </span>
-                                        <span class="ml-3 shrink-0 text-dim"
-                                            >{track.plays}</span
-                                        >
+                                                <Music
+                                                    size={14}
+                                                    class="text-dim"
+                                                    aria-hidden="true"
+                                                />
+                                            </div>
+                                        {/if}
                                     </div>
-                                    <div
-                                        class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"
-                                    >
+                                    <div class="min-w-0 flex-1">
                                         <div
-                                            class="h-full rounded-full bg-primary"
-                                            style="width: {(track.plays /
-                                                maxTrackPlays) *
-                                                100}%"
-                                        ></div>
+                                            class="flex items-center justify-between text-sm"
+                                        >
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-white"
+                                            >
+                                                {#if href}
+                                                    <a
+                                                        {href}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        class="link hover:text-primary"
+                                                        >{track.track}</a
+                                                    >
+                                                {:else}
+                                                    {track.track}
+                                                {/if}
+                                                <span class="text-dim">
+                                                    — {track.artist}</span
+                                                >
+                                            </span>
+                                            <span
+                                                class="ml-3 shrink-0 text-dim"
+                                                >{track.plays}</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"
+                                        >
+                                            <div
+                                                class="h-full rounded-full bg-primary"
+                                                style="width: {(track.plays /
+                                                    maxTrackPlays) *
+                                                    100}%"
+                                            ></div>
+                                        </div>
                                     </div>
                                 </li>
                             {/each}
                         </ul>
                     </div>
                 {/if}
+
             </div>
         </div>
+
+        {#if data.topAlbums.length || data.discoveries.length}
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {#if data.topAlbums.length}
+                    <div
+                        class="rounded-lg border border-border p-5 sm:p-6"
+                        use:reveal
+                    >
+                        <p
+                            class="text-xs font-medium uppercase tracking-wide text-dim"
+                        >
+                            Top albums
+                        </p>
+                        <ul class="mt-4 flex flex-col gap-3">
+                            {#each data.topAlbums as album}
+                                {@const art = albumArt(album.spotifyUri)}
+                                <li class="flex items-center gap-3">
+                                    <div
+                                        class="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-surface-2"
+                                    >
+                                        {#if art}
+                                            <img
+                                                src={art}
+                                                alt=""
+                                                class="h-full w-full object-cover"
+                                            />
+                                        {:else}
+                                            <div
+                                                class="flex h-full w-full items-center justify-center"
+                                            >
+                                                <Music
+                                                    size={14}
+                                                    class="text-dim"
+                                                    aria-hidden="true"
+                                                />
+                                            </div>
+                                        {/if}
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div
+                                            class="flex items-center justify-between text-sm"
+                                        >
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-white"
+                                            >
+                                                {album.album}
+                                                <span class="text-dim">
+                                                    — {album.artist}</span
+                                                >
+                                            </span>
+                                            <span
+                                                class="ml-3 shrink-0 text-dim"
+                                                >{album.plays} plays</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"
+                                        >
+                                            <div
+                                                class="h-full rounded-full bg-primary"
+                                                style="width: {(album.msPlayed /
+                                                    maxAlbumMs) *
+                                                    100}%"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/if}
+
+                {#if data.discoveries.length}
+                    <div
+                        class="rounded-lg border border-border p-5 sm:p-6"
+                        use:reveal
+                    >
+                        <p
+                            class="text-xs font-medium uppercase tracking-wide text-dim"
+                        >
+                            Discovered in {data.selectedYear}
+                        </p>
+                        <ul class="mt-4 flex flex-col gap-3">
+                            {#each data.discoveries as discovery}
+                                <li
+                                    class="flex items-center justify-between gap-3 text-sm"
+                                >
+                                    <span class="min-w-0 flex-1 truncate text-white"
+                                        >{discovery.artist}</span
+                                    >
+                                    <span class="shrink-0 text-dim">
+                                        {formatDate(discovery.firstPlayedAt)}
+                                    </span>
+                                </li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/if}
+            </div>
+        {/if}
+
+        {#if monthlyBars.length}
+            <div
+                class="mt-4 rounded-lg border border-border p-5 sm:p-6"
+                use:reveal
+            >
+                <p class="text-xs font-medium uppercase tracking-wide text-dim">
+                    Monthly trend
+                </p>
+                <div class="mt-3 flex h-20 items-end gap-[3px] overflow-x-auto pb-1">
+                    {#each monthlyBars as m}
+                        <div
+                            class="w-2 shrink-0 rounded-sm bg-primary/70"
+                            style:height="{Math.max(
+                                4,
+                                (m.plays / maxMonthly) * 100,
+                            )}%"
+                            title="{formatMonth(m.month)} — {m.plays} plays"
+                        ></div>
+                    {/each}
+                </div>
+                <div class="mt-1 flex justify-between text-[10px] text-dim">
+                    <span>{formatMonth(monthlyBars[0].month)}</span>
+                    <span
+                        >{formatMonth(
+                            monthlyBars[monthlyBars.length - 1].month,
+                        )}</span
+                    >
+                </div>
+            </div>
+        {/if}
 
         {#if heatmapWeeks.length}
             <div

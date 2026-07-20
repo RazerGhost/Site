@@ -9,7 +9,12 @@ import {
 	getHourlyBreakdown,
 	getTrackHistory,
 	searchPlays,
-	getOnThisDay
+	getOnThisDay,
+	getTopAlbums,
+	getSkipShuffleStats,
+	getMonthlyTrend,
+	getDiscoveries,
+	getActiveDates
 } from './spotify-history-db';
 import type { PlayRecord } from './spotify-history-db';
 
@@ -209,5 +214,107 @@ describe('searchPlays', () => {
 			expect.objectContaining({ track: 'Song A', plays: 2 }),
 			expect.objectContaining({ track: 'Other', plays: 1 })
 		]);
+	});
+});
+
+describe('getTopAlbums', () => {
+	it('aggregates multiple tracks from the same album', () => {
+		insertPlays([
+			play({ album: 'Album A', artist: 'Artist A', spotifyUri: 'a', msPlayed: 100000 }),
+			play({ album: 'Album A', artist: 'Artist A', spotifyUri: 'b', msPlayed: 100000 })
+		]);
+		const albums = getTopAlbums();
+		expect(albums).toHaveLength(1);
+		expect(albums[0]).toMatchObject({ album: 'Album A', artist: 'Artist A', plays: 2, msPlayed: 200000 });
+	});
+
+	it('excludes rows with no album', () => {
+		insertPlays([play({ album: null, spotifyUri: 'a' })]);
+		expect(getTopAlbums()).toEqual([]);
+	});
+
+	it('keeps same-named albums by different artists separate', () => {
+		insertPlays([
+			play({ album: 'Greatest Hits', artist: 'Artist A', spotifyUri: 'a' }),
+			play({ album: 'Greatest Hits', artist: 'Artist B', spotifyUri: 'b' })
+		]);
+		expect(getTopAlbums()).toHaveLength(2);
+	});
+});
+
+describe('getSkipShuffleStats', () => {
+	it('computes skip/shuffle rates from rated rows', () => {
+		insertPlays([
+			play({ spotifyUri: 'a', skipped: true, shuffle: true }),
+			play({ spotifyUri: 'b', skipped: false, shuffle: false }),
+			play({ spotifyUri: 'c', skipped: false, shuffle: true })
+		]);
+		const stats = getSkipShuffleStats();
+		expect(stats.skipRate).toBeCloseTo((1 / 3) * 100);
+		expect(stats.shuffleRate).toBeCloseTo((2 / 3) * 100);
+	});
+
+	it('ignores NULL skip/shuffle rows (e.g. live-scrobble gaps) in the denominator', () => {
+		insertPlays([
+			play({ spotifyUri: 'a', skipped: true, shuffle: null }),
+			play({ spotifyUri: 'b', skipped: null, shuffle: null, platform: 'live-scrobble' })
+		]);
+		const stats = getSkipShuffleStats();
+		expect(stats.ratedSkips).toBe(1);
+		expect(stats.skipRate).toBe(100);
+		expect(stats.ratedShuffle).toBe(0);
+		expect(stats.shuffleRate).toBeNull();
+	});
+
+	it('returns null rates for an empty library', () => {
+		const stats = getSkipShuffleStats();
+		expect(stats.skipRate).toBeNull();
+		expect(stats.shuffleRate).toBeNull();
+	});
+});
+
+describe('getMonthlyTrend', () => {
+	it('groups plays by calendar month', () => {
+		insertPlays([
+			play({ playedAt: '2025-06-01T10:00:00.000Z', spotifyUri: 'a' }),
+			play({ playedAt: '2025-06-15T10:00:00.000Z', spotifyUri: 'b' }),
+			play({ playedAt: '2025-07-01T10:00:00.000Z', spotifyUri: 'c' })
+		]);
+		expect(getMonthlyTrend()).toEqual([
+			{ month: '2025-06', plays: 2, msPlayed: 360000 },
+			{ month: '2025-07', plays: 1, msPlayed: 180000 }
+		]);
+	});
+});
+
+describe('getDiscoveries', () => {
+	it('lists artists whose true first play falls in the given year', () => {
+		insertPlays([
+			play({ artist: 'Artist A', spotifyUri: 'a', playedAt: '2025-03-01T00:00:00.000Z' }),
+			play({ artist: 'Artist A', spotifyUri: 'b', playedAt: '2024-01-01T00:00:00.000Z' }), // earlier play excludes it from 2025
+			play({ artist: 'Artist B', spotifyUri: 'c', playedAt: '2025-05-01T00:00:00.000Z' })
+		]);
+		const discoveries = getDiscoveries(2025);
+		expect(discoveries.map((d) => d.artist)).toEqual(['Artist B']);
+	});
+
+	it('orders by first-played date, most recent discovery first', () => {
+		insertPlays([
+			play({ artist: 'Artist Early', spotifyUri: 'a', playedAt: '2025-02-01T00:00:00.000Z' }),
+			play({ artist: 'Artist Late', spotifyUri: 'b', playedAt: '2025-09-01T00:00:00.000Z' })
+		]);
+		const discoveries = getDiscoveries(2025);
+		expect(discoveries.map((d) => d.artist)).toEqual(['Artist Late', 'Artist Early']);
+	});
+});
+
+describe('getActiveDates', () => {
+	it('returns distinct dates, sorted', () => {
+		insertPlays([
+			play({ playedAt: '2025-06-02T10:00:00.000Z', spotifyUri: 'a' }),
+			play({ playedAt: '2025-06-01T10:00:00.000Z', spotifyUri: 'b' }),
+			play({ playedAt: '2025-06-01T11:00:00.000Z', spotifyUri: 'c' })
+		]);
+		expect(getActiveDates()).toEqual(['2025-06-01', '2025-06-02']);
 	});
 });

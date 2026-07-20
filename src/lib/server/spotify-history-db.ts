@@ -106,7 +106,7 @@ export type ListeningStats = {
 	lastPlayedAt: string | null;
 	peakYear: number | null;
 	peakWeekday: number | null; // 0 = Sunday, matches JS Date#getDay
-	topArtists: { artist: string; plays: number; msPlayed: number }[];
+	topArtists: { artist: string; plays: number; msPlayed: number; spotifyUri: string | null }[];
 	topTracks: { track: string; artist: string; plays: number; spotifyUri: string | null }[];
 };
 
@@ -149,10 +149,12 @@ function computeListeningStats(opts: { year?: number } = {}): ListeningStats {
 
 	const topArtists = database
 		.prepare(
-			`SELECT artist, COUNT(*) as plays, SUM(ms_played) as msPlayed
+			`SELECT artist, COUNT(*) as plays, SUM(ms_played) as msPlayed,
+			        (SELECT p2.spotify_uri FROM plays p2 WHERE p2.artist = plays.artist AND p2.spotify_uri IS NOT NULL
+			         GROUP BY p2.spotify_uri ORDER BY COUNT(*) DESC LIMIT 1) as spotifyUri
 			 FROM plays ${yearFilter} GROUP BY artist ORDER BY msPlayed DESC LIMIT 5`
 		)
-		.all(params) as { artist: string; plays: number; msPlayed: number }[];
+		.all(params) as { artist: string; plays: number; msPlayed: number; spotifyUri: string | null }[];
 
 	const topTracks = database
 		.prepare(
@@ -346,4 +348,114 @@ export function searchPlays(query: string): SearchResult[] {
 			 GROUP BY track, artist ORDER BY plays DESC LIMIT 20`
 		)
 		.all({ like }) as SearchResult[];
+}
+
+export type TopAlbum = {
+	album: string;
+	artist: string;
+	plays: number;
+	msPlayed: number;
+	spotifyUri: string | null;
+};
+
+// Top 5 albums by total ms played — grouped by (album, artist) so two
+// different artists' albums with the same title don't get merged together.
+export function getTopAlbums(opts: { year?: number } = {}): TopAlbum[] {
+	return memoized(`topAlbums:${opts.year ?? 'all'}`, () => {
+		const clauses = ['album IS NOT NULL'];
+		if (opts.year != null) clauses.push('played_at >= @yearStart AND played_at < @yearEnd');
+		const params = opts.year != null ? yearRange(opts.year) : {};
+		return getDb()
+			.prepare(
+				`SELECT album, artist, COUNT(*) as plays, SUM(ms_played) as msPlayed, MAX(spotify_uri) as spotifyUri
+				 FROM plays WHERE ${clauses.join(' AND ')}
+				 GROUP BY album, artist ORDER BY msPlayed DESC LIMIT 5`
+			)
+			.all(params) as TopAlbum[];
+	});
+}
+
+export type SkipShuffleStats = {
+	ratedSkips: number;
+	skippedCount: number;
+	skipRate: number | null; // 0-100, null if nothing has skip data yet
+	ratedShuffle: number;
+	shuffledCount: number;
+	shuffleRate: number | null; // 0-100, null if nothing has shuffle data yet
+};
+
+// skipped/shuffle are only present on export rows (live-scrobble rows always
+// write NULL for both, see scrobble/+server.ts) — COUNT(col)/SUM(col) ignore
+// NULLs, so the rate stays accurate even with scrobble-only rows in the mix.
+export function getSkipShuffleStats(opts: { year?: number } = {}): SkipShuffleStats {
+	return memoized(`skipShuffle:${opts.year ?? 'all'}`, () => {
+		const yearFilter = opts.year != null ? `WHERE played_at >= @yearStart AND played_at < @yearEnd` : '';
+		const params = opts.year != null ? yearRange(opts.year) : {};
+
+		const totals = getDb()
+			.prepare(
+				`SELECT COUNT(skipped) as ratedSkips, COALESCE(SUM(skipped), 0) as skippedCount,
+				        COUNT(shuffle) as ratedShuffle, COALESCE(SUM(shuffle), 0) as shuffledCount
+				 FROM plays ${yearFilter}`
+			)
+			.get(params) as { ratedSkips: number; skippedCount: number; ratedShuffle: number; shuffledCount: number };
+
+		return {
+			...totals,
+			skipRate: totals.ratedSkips > 0 ? (totals.skippedCount / totals.ratedSkips) * 100 : null,
+			shuffleRate: totals.ratedShuffle > 0 ? (totals.shuffledCount / totals.ratedShuffle) * 100 : null
+		};
+	});
+}
+
+export type MonthlyTrendPoint = { month: string; plays: number; msPlayed: number }; // month = "YYYY-MM"
+
+// Play counts/ms grouped by calendar month — like getHourlyBreakdown and
+// getAvailableYears, strftime() forces a full scan rather than using
+// idx_plays_played_at, but the result is memoized so it's paid once per
+// year-selection.
+export function getMonthlyTrend(opts: { year?: number } = {}): MonthlyTrendPoint[] {
+	return memoized(`monthlyTrend:${opts.year ?? 'all'}`, () => {
+		const yearFilter = opts.year != null ? `WHERE played_at >= @yearStart AND played_at < @yearEnd` : '';
+		const params = opts.year != null ? yearRange(opts.year) : {};
+		return getDb()
+			.prepare(
+				`SELECT strftime('%Y-%m', played_at) as month, COUNT(*) as plays, SUM(ms_played) as msPlayed
+				 FROM plays ${yearFilter} GROUP BY month ORDER BY month`
+			)
+			.all(params) as MonthlyTrendPoint[];
+	});
+}
+
+export type Discovery = { artist: string; firstPlayedAt: string; plays: number };
+
+// Artists whose true first-ever play (across all history, not just the
+// filtered year) falls within `year` — "discovered this year". Deliberately
+// not year-filtered in WHERE: needs every row to compute each artist's real
+// MIN(played_at), then filters on that in HAVING.
+export function getDiscoveries(year: number, limit = 10): Discovery[] {
+	return memoized(`discoveries:${year}:${limit}`, () => {
+		const { yearStart, yearEnd } = yearRange(year);
+		return getDb()
+			.prepare(
+				`SELECT artist, MIN(played_at) as firstPlayedAt, COUNT(*) as plays
+				 FROM plays GROUP BY artist
+				 HAVING firstPlayedAt >= @yearStart AND firstPlayedAt < @yearEnd
+				 ORDER BY firstPlayedAt DESC LIMIT @limit`
+			)
+			.all({ yearStart, yearEnd, limit }) as Discovery[];
+	});
+}
+
+// Distinct calendar dates with at least one play, all-time — feeds streak
+// calculation (listening-streaks.ts). Not year-scoped, like peakYear, since a
+// streak spanning a year boundary shouldn't be truncated by the year filter.
+export function getActiveDates(): string[] {
+	return memoized('activeDates', () =>
+		(
+			getDb()
+				.prepare(`SELECT DISTINCT date(played_at) as date FROM plays ORDER BY date`)
+				.all() as { date: string }[]
+		).map((r) => r.date)
+	);
 }
