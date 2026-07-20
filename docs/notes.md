@@ -29,7 +29,7 @@ That throttle exists because the notes editor autosaves on every ~1s typing paus
 
 ## Attachments
 
-Images pasted/uploaded into note bodies go through `src/routes/api/notes/attachments/+server.ts` to a directory configured by `NOTES_ATTACHMENTS_DIR` (default `./data/note-attachments`), served back via `src/routes/notes/files/[filename]/+server.ts`. Must live on the same persistent volume as `notes.db` — see [deployment.md](deployment.md).
+Images pasted/uploaded into note bodies go through `src/routes/api/notes/attachments/+server.ts` to a directory configured by `NOTES_ATTACHMENTS_DIR` (default `./data/note-attachments`), served back via `src/routes/notes/files/[filename]/+server.ts` — gated behind the same login as `/notes`, since attachments are private. The `/admin/media` library ([environment.md#media_dir](environment.md)) is a sibling pattern for images that need to be *publicly* viewable (devlog/project covers, galleries, body images) — same shape, but served without auth.
 
 ## Testing
 

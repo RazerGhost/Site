@@ -24,7 +24,7 @@ Multi-stage build:
 
 ## Persistent data volume
 
-See the top-level README's [Persistent data](../README.md#persistent-data) section for the four SQLite files under `data/`. The critical thing the Dockerfile's `VOLUME ["/app/data"]` line does **not** do: persist anything across a Coolify redeploy. Coolify replaces the container from the image on every deploy, so an anonymous Docker volume is discarded along with it.
+See the top-level README's [Persistent data](../README.md#persistent-data) section for the SQLite files and upload directories under `data/`. The critical thing the Dockerfile's `VOLUME ["/app/data"]` line does **not** do: persist anything across a Coolify redeploy. Coolify replaces the container from the image on every deploy, so an anonymous Docker volume is discarded along with it.
 
 **Before the first real deploy**, go to the app's **Storages** tab in Coolify and add a persistent volume mounted at `/app/data` (any volume name works). Skipping this step means `notes.db` and `spotify-history.db` — both irreplaceable, real user content — get wiped on the very next redeploy.
 

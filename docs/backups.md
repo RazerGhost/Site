@@ -1,6 +1,8 @@
 # Backups
 
-A Coolify persistent volume ([deployment.md](deployment.md)) protects `data/` across redeploys, but not against the server itself being renewed, rebuilt, or deleted — that requires state living somewhere outside the box entirely. `GET /api/backup` ([+server.ts](../src/routes/api/backup/+server.ts)) does that: it dumps the four `data/` SQLite DBs plus `note-attachments/` and pushes them to a private git repo, on the same "secret-gated endpoint hit by a scheduler" pattern as the Spotify scrobble endpoint ([listens.md](listens.md)).
+A Coolify persistent volume ([deployment.md](deployment.md)) protects `data/` across redeploys, but not against the server itself being renewed, rebuilt, or deleted — that requires state living somewhere outside the box entirely. `GET /api/backup` ([+server.ts](../src/routes/api/backup/+server.ts)) does that: it dumps the four `data/` SQLite DBs plus `note-attachments/` and the media library (`media/`) and pushes them to a private git repo, on the same "secret-gated endpoint hit by a scheduler" pattern as the Spotify scrobble endpoint ([listens.md](listens.md)).
+
+The actual clone/dump/mirror/commit/push logic lives in `runBackup()` in [backup.ts](../src/lib/server/backup.ts), not the endpoint itself — `+server.ts` is just a secret check that calls it. `runBackup()` is also called by the "Run backup now" button on `/admin/backups` (gated by the ordinary `/admin` login, not `BACKUP_SECRET`), which additionally reads `getLastBackupInfo()` (a shallow clone of the backup remote to read its last commit) to show when the last backup ran, and `backupConfigured()` to hide the page's controls entirely when `BACKUP_GIT_REMOTE` isn't set.
 
 ## Why text dumps, not the raw `.db` files
 
@@ -22,7 +24,7 @@ On `GET /api/backup` with a valid secret:
 
 1. Shallow-clones `BACKUP_GIT_REMOTE` (branch `BACKUP_GIT_BRANCH`, default `main`) into a temp directory. If the branch doesn't exist yet (first run against a freshly created empty repo), falls back to cloning the repo and creating an orphan branch.
 2. Dumps each of the four DBs (skipping any that don't exist yet, e.g. `status.db` before `/notes/status` has ever been used) to `<name>.sql` in the checkout.
-3. Mirrors `note-attachments/` into the checkout (deletes and re-copies, so deleted attachments drop out of the backup too).
+3. Mirrors `note-attachments/` and the media library (`MEDIA_DIR`, default `data/media`) into the checkout (deletes and re-copies each, so deleted files drop out of the backup too).
 4. `git add -A`; if nothing changed since the last run, returns early without committing.
 5. Otherwise commits (author identity from `BACKUP_GIT_USER_NAME`/`BACKUP_GIT_USER_EMAIL`, both optional) and pushes.
 6. Deletes the temp directory in a `finally` block regardless of outcome.

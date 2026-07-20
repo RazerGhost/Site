@@ -22,6 +22,10 @@ Markdown posts can embed interactive Svelte components via `<div data-embed="Nam
 
 **Adding a new embeddable component** requires two steps: create the component in `devlog-embeds/`, and register it by name in `registry.ts`.
 
+## Images (cover, gallery, body)
+
+Devlog/project frontmatter's `cover` and `images` (gallery) fields, and any image embedded in a post body, are just URL strings — nothing in the content pipeline itself uploads or validates them. The admin editors ([+layout.svelte](../src/routes/admin/+layout.svelte) and friends under `src/routes/admin/devlog`/`src/routes/admin/projects`) source those URLs from the media library ([media.ts](../src/lib/server/media.ts), `MEDIA_DIR` — see [environment.md](environment.md)) via `MediaPicker.svelte`/`MediaLibrary.svelte`: a "Browse…" button fills `cover`, "Add image…" appends to `images` (multi-select), and pasting/dropping an image into the body textarea uploads it and inserts `![](url)` at the cursor. This replaced an earlier manual workflow of dropping a file into `static/` and typing its path — `static/` is baked into the Docker image at build time (see [deployment.md](deployment.md)), so it never worked from a running prod session and didn't survive a redeploy either. Media URLs are served publicly (no login) from `src/routes/media/[filename]/+server.ts`, since cover/gallery/body images appear on public pages.
+
 ## OG images & RSS
 
 [og.ts](../src/lib/server/og.ts) generates per-post/per-project Open Graph preview images (used by `[slug]/og.png/+server.ts` routes) using `satori` + `resvg` — this needs real font bytes rather than system fonts, which is why `src/lib/server/fonts/*.woff` are read from disk at request time and explicitly copied into the Docker runtime image (see [deployment.md](deployment.md)), rather than routed through Vite's asset pipeline like other static assets.

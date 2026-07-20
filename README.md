@@ -21,9 +21,9 @@ Licensed under [PolyForm Noncommercial 1.0.0](LICENSE). In short: fork it, modif
 | `/watchlist` | Currently-watching + full library, pulled from Simkl |
 | `/watching` | Legacy route, redirects to `/watchlist` |
 | `/listens` | Spotify listening history stats, built from an imported data export |
-| `/notes` | Private notes area, gated behind GitHub OAuth login (owner-only); `/notes/status` edits the homepage's "Right now" card |
+| `/notes` | Private notes area, gated behind GitHub OAuth login (owner-only) |
 | `/spotify-import` | Upload UI for Spotify history exports (same GitHub gate as `/notes`) |
-| `/admin` | Private dashboard linking to every editing tool above (same GitHub gate) |
+| `/admin` | Private dashboard (same GitHub gate) linking to every editing tool: devlog/projects editors, status editor, watchlist cache inspector, media library, and backup status |
 
 ## Getting started
 
@@ -53,6 +53,7 @@ Every integration below is optional and degrades gracefully — the site runs fi
 | `SIMKL_CLIENT_ID`, `SIMKL_ACCESS_TOKEN` | `/watchlist` | Simkl's PIN device flow; token is long-lived (~5yr), no refresh needed. |
 | `GITHUB_CLIENT_ID/SECRET`, `SESSION_SECRET` | `/notes`, `/spotify-import` login gate | GitHub OAuth App restricted to a single allow-listed username (`site.githubUsername`). |
 | `NOTES_DB_PATH`, `NOTES_ATTACHMENTS_DIR` | `/notes` storage | Default to `./data/*`; must live on a persistent volume in production. |
+| `MEDIA_DIR` | `/admin/media`, devlog/project cover/gallery/body images | Default to `./data/media`; must live on a persistent volume in production. Served publicly (no login), unlike `NOTES_ATTACHMENTS_DIR`. |
 | `SIMKL_CACHE_DB_PATH` | Simkl lookup cache | Losing this is non-destructive — it just re-warms. |
 | `STATUS_DB_PATH` | `/notes/status`, homepage "Right now" card | Default to `./data/status.db`. Losing this just reverts to the hardcoded fallback in `status-db.ts`. |
 | `SPOTIFY_HISTORY_DB_PATH` | `/listens` storage | Populated by uploading a Spotify "extended streaming history" export at `/spotify-import`. **Not trivially rebuildable if lost** — the export is a one-time historical dump. |
@@ -84,18 +85,20 @@ Every integration below is optional and degrades gracefully — the site runs fi
 
 ## Persistent data
 
-Four SQLite files live under `data/` at the repo/container root:
+Four SQLite files, plus two upload directories, live under `data/` at the repo/container root:
 
 - **`notes.db`** — private notes ([notes.ts](src/lib/server/notes.ts)). Losing this loses real content.
 - **`spotify-history.db`** — imported Spotify listening history ([spotify-history-db.ts](src/lib/server/spotify-history-db.ts)). Losing this loses real content that can only be rebuilt by re-requesting and re-importing the Spotify export (can take up to 30 days to arrive) — not something that "just re-warms".
 - **`simkl-cache.db`** — cached Simkl genre/synopsis/runtime lookups plus a full-library fallback snapshot ([simkl-cache.ts](src/lib/server/simkl-cache.ts)). Losing this is non-destructive — `/watchlist`'s enrichment data just goes cold and re-warms itself over the next several page loads.
-- **`status.db`** — the homepage's "Right now" status items ([status-db.ts](src/lib/server/status-db.ts)), edited at `/notes/status`. Losing this just reverts to the hardcoded fallback.
+- **`status.db`** — the homepage's "Right now" status items ([status-db.ts](src/lib/server/status-db.ts)), edited at `/admin/status`. Losing this just reverts to the hardcoded fallback.
+- **`note-attachments/`** — images pasted/uploaded into private note bodies, served under auth. See [docs/notes.md](docs/notes.md#attachments).
+- **`media/`** — images uploaded through `/admin/media` for devlog/project covers, galleries, and post bodies, served publicly (no login). See [docs/environment.md](docs/environment.md).
 
-All four default to `./data/*.db` (overridable via `NOTES_DB_PATH` / `SIMKL_CACHE_DB_PATH` / `SPOTIFY_HISTORY_DB_PATH` / `STATUS_DB_PATH`). The Dockerfile declares `/app/data` as a `VOLUME`, but **that alone does not persist anything across a Coolify redeploy** — Coolify replaces the container from the image each deploy, so an anonymous volume goes with it. In Coolify, under the app's **Storages** tab, add a persistent volume mounted at `/app/data` *before* the first real deploy.
+All default to `./data/*` (overridable via `NOTES_DB_PATH` / `SIMKL_CACHE_DB_PATH` / `SPOTIFY_HISTORY_DB_PATH` / `STATUS_DB_PATH` / `NOTES_ATTACHMENTS_DIR` / `MEDIA_DIR`). The Dockerfile declares `/app/data` as a `VOLUME`, but **that alone does not persist anything across a Coolify redeploy** — Coolify replaces the container from the image each deploy, so an anonymous volume goes with it. In Coolify, under the app's **Storages** tab, add a persistent volume mounted at `/app/data` *before* the first real deploy.
 
 ### Backups
 
-A persistent volume protects against redeploys, not against the server itself being renewed or deleted. `GET /api/backup` ([+server.ts](src/routes/api/backup/+server.ts)) dumps the four DBs above to plain-text SQL — schema + `INSERT` statements via [backup.ts](src/lib/server/backup.ts), not the raw binary files, so changes diff cleanly in git instead of bloating the repo — plus `note-attachments/`, and commits + pushes them to a private git repo.
+A persistent volume protects against redeploys, not against the server itself being renewed or deleted. `GET /api/backup` ([+server.ts](src/routes/api/backup/+server.ts)) dumps the four DBs above to plain-text SQL — schema + `INSERT` statements via [backup.ts](src/lib/server/backup.ts), not the raw binary files, so changes diff cleanly in git instead of bloating the repo — plus `note-attachments/` and `media/`, and commits + pushes them to a private git repo. The same logic (`runBackup()`) can also be triggered manually from `/admin/backups`, which shows when the last backup ran. See [docs/backups.md](docs/backups.md) for the full setup.
 
 Setup:
 
