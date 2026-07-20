@@ -122,8 +122,14 @@ export const gearGroups: { label: string; icon: GearIcon; items: GearItem[] }[] 
         name: "Gigabyte RTX 3070 Eagle OC",
         href: "https://www.gigabyte.com/Graphics-Card/GV-N3070EAGLE-OC-8GD-rev-20",
       },
-      { name: "AOC 24G1WG4 (24\")" },
-      { name: "Dell P2414H (24\")" },
+      {
+        name: "AOC 24G1WG4 (24\")",
+        href: "https://www.aoc.com/en/gaming/products/monitors/24g1wg4",
+      },
+      {
+        name: "Dell P2414H (24\")",
+        href: "https://www.dell.com/support/manuals/en-us/dell-p2414h-monitor",
+      },
     ],
   },
   {
