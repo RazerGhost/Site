@@ -4,7 +4,7 @@
 	import Smartphone from '@lucide/svelte/icons/smartphone';
 	import Globe from '@lucide/svelte/icons/globe';
 
-	let { compact = false }: { compact?: boolean } = $props();
+	let { compact = false, activityOnly = false }: { compact?: boolean; activityOnly?: boolean } = $props();
 
 	interface LanyardActivity {
 		name: string;
@@ -106,7 +106,37 @@
 	}
 </script>
 
-{#if compact}
+{#if activityOnly}
+	{#if status === 'loading'}
+		<p class="text-sm text-dim">Checking Discord…</p>
+	{:else if status === 'error' || !data}
+		<p class="text-sm text-dim">Discord status unavailable.</p>
+	{:else if activity}
+		<div class="flex items-center gap-3">
+			{#if activityImage}
+				<img src={activityImage} alt="" class="h-14 w-14 shrink-0 rounded-md object-cover" />
+			{:else}
+				<span class="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-surface-2 text-xs text-dim">
+					{activity.name.slice(0, 1).toUpperCase()}
+				</span>
+			{/if}
+			<div class="min-w-0 flex-1">
+				<p class="truncate text-sm font-medium text-white">{activity.name}</p>
+				{#if activity.details}
+					<p class="truncate text-xs text-dim">{activity.details}</p>
+				{/if}
+				{#if activity.state}
+					<p class="truncate text-xs text-dim">{activity.state}</p>
+				{/if}
+				{#if activity.timestamps?.start}
+					<p class="mt-1 text-xs text-dim">{formatElapsed(activity.timestamps.start)}</p>
+				{/if}
+			</div>
+		</div>
+	{:else}
+		<p class="text-sm text-dim">Not doing anything on Discord right now.</p>
+	{/if}
+{:else if compact}
 	{#if status === 'loading'}
 		<p class="text-xs text-dim">Checking Discord…</p>
 	{:else if status === 'error' || !data}
@@ -174,9 +204,9 @@
 			{/if}
 
 			{#if activity}
-				<div class="mt-2 flex items-center gap-2 rounded-md border border-border bg-surface-2/50 px-2 py-1.5">
+				<div class="mt-3 flex items-center gap-2.5 border-t border-border pt-3">
 					{#if activityImage}
-						<img src={activityImage} alt="" class="h-8 w-8 shrink-0 rounded-md object-cover" />
+						<img src={activityImage} alt="" class="h-9 w-9 shrink-0 rounded-md object-cover" />
 					{/if}
 					<div class="min-w-0 flex-1">
 						<p class="truncate text-gray">{activity.name}</p>

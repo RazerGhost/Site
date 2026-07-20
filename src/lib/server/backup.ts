@@ -12,7 +12,8 @@ const DBS: { name: string; envVar: string; defaultFile: string }[] = [
 	{ name: 'notes', envVar: 'NOTES_DB_PATH', defaultFile: 'notes.db' },
 	{ name: 'simkl-cache', envVar: 'SIMKL_CACHE_DB_PATH', defaultFile: 'simkl-cache.db' },
 	{ name: 'spotify-history', envVar: 'SPOTIFY_HISTORY_DB_PATH', defaultFile: 'spotify-history.db' },
-	{ name: 'status', envVar: 'STATUS_DB_PATH', defaultFile: 'status.db' }
+	{ name: 'status', envVar: 'STATUS_DB_PATH', defaultFile: 'status.db' },
+	{ name: 'newtab-settings', envVar: 'NEWTAB_SETTINGS_DB_PATH', defaultFile: 'newtab-settings.db' }
 ];
 
 function dbPath(envVar: string, defaultFile: string): string {
@@ -27,7 +28,7 @@ export type BackupResult =
 	| { committed: true; dbs: string[]; timestamp: string }
 	| { committed: false; dbs: string[]; message: string };
 
-// Backs up the persistent-volume state (the four SQLite DBs, dumped as text
+// Backs up the persistent-volume state (the SQLite DBs listed in DBS below, dumped as text
 // so they diff cleanly in git — see dumpDatabaseToSql below — plus note
 // attachments and the media library) to a private git repo. Called from the
 // schedule-gated /api/backup endpoint and from the admin "run backup now"

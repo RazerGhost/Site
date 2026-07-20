@@ -118,14 +118,14 @@
 			<li>
 				<button
 					type="button"
-					class="flex w-full items-baseline justify-between gap-4 rounded-md px-2 py-1.5 text-left text-sm transition-colors {expandable
+					class="flex w-full items-start justify-between gap-4 rounded-md px-2 py-1.5 text-left text-sm transition-colors {expandable
 						? 'cursor-pointer hover:bg-surface-2'
 						: 'cursor-default'}"
 					onclick={() => toggle(event)}
 					aria-expanded={expandedId === event.id}
 					disabled={!expandable}
 				>
-					<span class="text-gray">
+					<span class="min-w-0 flex-1 text-gray break-words">
 						{#if expandable}
 							<span
 								class="mr-1 inline-block text-dim transition-transform {expandedId === event.id
@@ -142,7 +142,7 @@
 							{event.repo.name}
 						</a>
 					</span>
-					<span class="shrink-0 text-xs text-dim">{relativeTime(event.created_at)}</span>
+					<span class="shrink-0 text-xs whitespace-nowrap text-dim">{relativeTime(event.created_at)}</span>
 				</button>
 
 				{#if expandable && expandedId === event.id}

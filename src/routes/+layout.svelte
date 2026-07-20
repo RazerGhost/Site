@@ -15,7 +15,9 @@
 	// fixed-viewport canvas (it pushed total page height past 100vh, causing
 	// the whole page to scroll instead of just the canvas), and the global
 	// command palette's Ctrl+K would otherwise fight the notes page's own.
-	const isFullBleed = $derived(page.url.pathname === '/notes');
+	// /newtab is meant to stand in for the browser's own new-tab page, so the
+	// site nav/footer chrome doesn't belong there either.
+	const isFullBleed = $derived(page.url.pathname === '/notes' || page.url.pathname === '/newtab');
 </script>
 
 {#if isFullBleed}
