@@ -44,7 +44,7 @@
 
 	<div class="mt-8 grid gap-4" use:reveal>
 		{#each data.entries as entry (entry.slug)}
-			<DevlogCard {entry} />
+			<DevlogCard {entry} seriesInfo={data.seriesInfo[entry.slug]} />
 		{:else}
 			<p class="text-sm text-dim">No entries with this tag.</p>
 		{/each}

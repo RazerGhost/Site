@@ -161,6 +161,26 @@ export function getAllDevlogEntries(): DevlogMeta[] {
 	return entries;
 }
 
+// Computes each entry's position within its series (1-indexed) and the
+// series' total part count, keyed by slug. `allEntries` must be in
+// chronological (oldest-first) order — the same order returned by
+// getAllDevlogEntries() — so that part numbers line up with publish order.
+export function getSeriesInfoMap(allEntries: DevlogMeta[]): Map<string, { part: number; total: number }> {
+	const bySeries = new Map<string, DevlogMeta[]>();
+	for (const entry of allEntries) {
+		if (!entry.series) continue;
+		const parts = bySeries.get(entry.series) ?? [];
+		parts.push(entry);
+		bySeries.set(entry.series, parts);
+	}
+
+	const info = new Map<string, { part: number; total: number }>();
+	for (const parts of bySeries.values()) {
+		parts.forEach((entry, i) => info.set(entry.slug, { part: i + 1, total: parts.length }));
+	}
+	return info;
+}
+
 export function getDevlogEntry(slug: string): DevlogEntry | null {
 	if (!isValidSlug(slug)) return null;
 	const filename = `${slug}.md`;

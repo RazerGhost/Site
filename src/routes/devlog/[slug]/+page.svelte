@@ -21,6 +21,7 @@
 	);
 
 	const shareUrl = $derived(`${site.url}/devlog/${data.entry.slug}`);
+	const hasToc = $derived(data.entry.toc.length > 1);
 
 	let contentEl: HTMLElement;
 
@@ -47,12 +48,17 @@
 	noindex={data.entry.draft}
 />
 
-<main class="mx-auto max-w-2xl px-6 py-16">
-	<a href="/devlog" class="link flex items-center gap-1 text-sm text-primary hover:opacity-85">
-		<ArrowLeft size={15} aria-hidden="true" /> Devlog
-	</a>
+<main class="mx-auto max-w-2xl px-6 py-16 {hasToc ? 'lg:max-w-5xl' : ''}">
+	<div class="{hasToc ? 'lg:grid lg:grid-cols-[1fr_240px] lg:gap-12' : ''}">
+		<div class="lg:mx-auto lg:w-full lg:max-w-2xl">
+			<a href="/devlog" class="link flex items-center gap-1 text-sm text-primary hover:opacity-85">
+				<ArrowLeft size={15} aria-hidden="true" /> Devlog
+			</a>
+		</div>
+	</div>
 
-	<article class="mt-4">
+	<div class="{hasToc ? 'lg:grid lg:grid-cols-[1fr_240px] lg:items-start lg:gap-12' : ''}">
+	<article class="mt-4 lg:mx-auto lg:w-full {hasToc ? 'lg:max-w-2xl' : ''}">
 		{#if data.entry.draft}
 			<p
 				class="mb-4 inline-block rounded-full border border-warn/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warn"
@@ -116,8 +122,8 @@
 			<ShareButtons url={shareUrl} title={data.entry.title} />
 		</div>
 
-		{#if data.entry.toc.length > 1}
-			<div class="mt-6">
+		{#if hasToc}
+			<div class="mt-6 lg:hidden">
 				<TableOfContents toc={data.entry.toc} />
 			</div>
 		{/if}
@@ -125,44 +131,61 @@
 		<div class="devlog-content mt-8" bind:this={contentEl}>
 			{@html data.entry.html}
 		</div>
+
+		<div class="h-56" aria-hidden="true"></div>
 	</article>
 
+	{#if hasToc}
+		<aside class="hidden lg:sticky lg:top-20 lg:block">
+			<TableOfContents toc={data.entry.toc} />
+		</aside>
+	{/if}
+	</div>
+
 	{#if data.older || data.newer}
-		<nav class="mt-12 grid grid-cols-2 gap-4 border-t border-border pt-6" aria-label="Post navigation">
-			<div>
-				{#if data.older}
-					<a href="/devlog/{data.older.slug}" class="group block">
-						<span class="flex items-center gap-1 text-xs uppercase tracking-wide text-dim">
-							<ArrowLeft size={12} aria-hidden="true" /> Older
-						</span>
-						<span class="mt-1 block text-sm text-gray group-hover:text-primary">
-							{data.older.title}
-						</span>
-					</a>
-				{/if}
-			</div>
-			<div class="text-right">
-				{#if data.newer}
-					<a href="/devlog/{data.newer.slug}" class="group block">
-						<span class="flex items-center justify-end gap-1 text-xs uppercase tracking-wide text-dim">
-							Newer <ArrowRight size={12} aria-hidden="true" />
-						</span>
-						<span class="mt-1 block text-sm text-gray group-hover:text-primary">
-							{data.newer.title}
-						</span>
-					</a>
-				{/if}
-			</div>
+		<nav class="mt-12 grid gap-4 sm:grid-cols-2" aria-label="Post navigation">
+			{#if data.older}
+				<a
+					href="/devlog/{data.older.slug}"
+					class="card card--interactive group block rounded-lg border border-border bg-surface p-5 {!data.newer
+						? 'sm:col-span-2'
+						: ''}"
+				>
+					<span class="flex items-center gap-1 text-xs uppercase tracking-wide text-dim">
+						<ArrowLeft size={12} aria-hidden="true" /> Older
+					</span>
+					<span class="mt-2 block text-base font-semibold text-white group-hover:text-primary">
+						{data.older.title}
+					</span>
+				</a>
+			{/if}
+			{#if data.newer}
+				<a
+					href="/devlog/{data.newer.slug}"
+					class="card card--interactive group block rounded-lg border border-border bg-surface p-5 sm:text-right {!data.older
+						? 'sm:col-span-2'
+						: ''}"
+				>
+					<span class="flex items-center gap-1 text-xs uppercase tracking-wide text-dim sm:justify-end">
+						Newer <ArrowRight size={12} aria-hidden="true" />
+					</span>
+					<span class="mt-2 block text-base font-semibold text-white group-hover:text-primary">
+						{data.newer.title}
+					</span>
+				</a>
+			{/if}
 		</nav>
 	{/if}
 
 	{#if data.related.length}
-		<div class="mt-12">
-			<p class="text-xs font-semibold uppercase tracking-wide text-dim">More like this</p>
-			<div class="mt-4 grid gap-4">
-				{#each data.related as entry (entry.slug)}
-					<DevlogCard {entry} />
-				{/each}
+		<div class="mt-12 {hasToc ? 'lg:grid lg:grid-cols-[1fr_240px] lg:gap-12' : ''}">
+			<div class="lg:mx-auto lg:w-full lg:max-w-2xl">
+				<p class="text-xs font-semibold uppercase tracking-wide text-dim">More like this</p>
+				<div class="mt-4 grid gap-4">
+					{#each data.related as entry (entry.slug)}
+						<DevlogCard {entry} seriesInfo={data.seriesInfo[entry.slug]} />
+					{/each}
+				</div>
 			</div>
 		</div>
 	{/if}

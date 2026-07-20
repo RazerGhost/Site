@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getAllDevlogEntries, getDevlogEntry } from '$lib/server/devlog';
+import { getAllDevlogEntries, getDevlogEntry, getSeriesInfoMap } from '$lib/server/devlog';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
@@ -34,5 +34,12 @@ export const load: PageServerLoad = ({ params }) => {
 			})()
 		: null;
 
-	return { entry, older, newer, related, series };
+	return {
+		entry,
+		older,
+		newer,
+		related,
+		series,
+		seriesInfo: Object.fromEntries(getSeriesInfoMap(allEntries))
+	};
 };

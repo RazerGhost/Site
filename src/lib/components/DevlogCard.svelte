@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { DevlogMeta } from '$lib/server/devlog';
 
-	let { entry }: { entry: DevlogMeta } = $props();
+	let {
+		entry,
+		seriesInfo
+	}: { entry: DevlogMeta; seriesInfo?: { part: number; total: number } } = $props();
 
 	const formattedDate = $derived(
 		new Date(entry.date).toLocaleDateString('en-US', {
@@ -23,6 +26,11 @@
 	<p class="text-xs uppercase tracking-wide text-dim">
 		{formattedDate} · {entry.readingTime} min read
 	</p>
+	{#if entry.series && seriesInfo}
+		<p class="mt-1 text-xs font-medium text-primary">
+			{entry.series} · Part {seriesInfo.part} of {seriesInfo.total}
+		</p>
+	{/if}
 	<h3 class="mt-2 text-lg font-semibold text-white group-hover:text-primary">
 		{entry.title}
 	</h3>

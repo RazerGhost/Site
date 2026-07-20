@@ -2,13 +2,29 @@
 	import DevlogCard from '$lib/components/DevlogCard.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { reveal } from '$lib/actions/reveal';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import Rss from '@lucide/svelte/icons/rss';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	let selectedTag = $state<string | null>(null);
-	let query = $state('');
+	const initialParams = page.url.searchParams;
+
+	let selectedTag = $state<string | null>(initialParams.get('tag'));
+	let query = $state(initialParams.get('q') ?? '');
+
+	// Keep the URL in sync with the search/tag filters so a filtered view is
+	// reload-safe and shareable — replaceState only, since filtering happens
+	// client-side over already-loaded data and shouldn't trigger a server
+	// round-trip (same approach as /gear's category filter).
+	$effect(() => {
+		const params = new URLSearchParams();
+		if (query.trim()) params.set('q', query.trim());
+		if (selectedTag) params.set('tag', selectedTag);
+		const qs = params.toString();
+		replaceState(qs ? `?${qs}` : location.pathname, {});
+	});
 
 	const tagCounts = $derived.by(() => {
 		const counts = new Map<string, number>();
@@ -53,6 +69,7 @@
 		<h1 class="text-3xl font-extrabold tracking-tight text-white">Devlog</h1>
 		<a
 			href="/devlog/rss.xml"
+			data-sveltekit-reload
 			class="link flex items-center gap-1.5 text-sm text-dim hover:text-primary"
 		>
 			<Rss size={14} aria-hidden="true" /> RSS
@@ -111,7 +128,7 @@
 
 	<div class="mt-8 grid gap-4 sm:grid-cols-2" use:reveal>
 		{#each filtered as entry (entry.slug)}
-			<DevlogCard {entry} />
+			<DevlogCard {entry} seriesInfo={data.seriesInfo[entry.slug]} />
 		{:else}
 			<p class="text-sm text-dim">No entries match your search.</p>
 		{/each}
