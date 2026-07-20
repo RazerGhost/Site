@@ -19,6 +19,8 @@
 		firstPlayedAt?: string;
 	}
 
+	let { bare = false, fallback }: { bare?: boolean; fallback?: import('svelte').Snippet } = $props();
+
 	let data = $state<SpotifyState | null>(null);
 	let history = $state<HistoryLookup | null>(null);
 	let now = $state(Date.now());
@@ -71,9 +73,21 @@
 	$effect(() => {
 		poll();
 		const id = setInterval(() => (now = Date.now()), 1000);
+
+		// setInterval-based polling gets throttled in background tabs — catch
+		// up as soon as the tab is visible/focused again instead of waiting
+		// for the next scheduled poll (same fix as SpotifyWidget).
+		const onVisible = () => {
+			if (document.visibilityState === 'visible') poll();
+		};
+		document.addEventListener('visibilitychange', onVisible);
+		window.addEventListener('focus', onVisible);
+
 		return () => {
 			clearTimeout(pollTimeout);
 			clearInterval(id);
+			document.removeEventListener('visibilitychange', onVisible);
+			window.removeEventListener('focus', onVisible);
 		};
 	});
 
@@ -93,8 +107,8 @@
 	}
 </script>
 
-{#if data?.playing && data.track}
-	<div class="rounded-lg border border-border p-5 sm:p-6" data-hero-reveal="0">
+{#snippet nowPlaying()}
+	{#if !bare}
 		<p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
 			<span class="relative flex h-2 w-2">
 				<span class="absolute h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
@@ -102,41 +116,53 @@
 			</span>
 			Listening now
 		</p>
-		<div class="mt-3 flex items-center gap-3">
-			{#if data.albumArt}
-				<img src={data.albumArt} alt="" class="h-14 w-14 shrink-0 rounded-md object-cover" />
-			{:else}
-				<span class="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-surface-2">
-					<Music size={20} class="text-primary" aria-hidden="true" />
-				</span>
-			{/if}
-			<div class="min-w-0 flex-1">
-				<a
-					href={data.url}
-					target="_blank"
-					rel="noreferrer"
-					class="link block truncate text-sm font-medium text-white hover:text-primary"
-				>
-					{data.track}
-				</a>
-				<p class="truncate text-xs text-dim">{data.artist}</p>
-				{#if history?.found}
-					<p class="mt-1 text-xs text-dim">
-						Played {history.plays} time{history.plays === 1 ? '' : 's'} before
-						{#if history.firstPlayedAt}
-							&middot; first in {formatDate(history.firstPlayedAt)}
-						{/if}
-					</p>
-				{/if}
-			</div>
-		</div>
-		{#if data.durationMs}
-			<div class="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-2">
-				<div
-					class="h-full rounded-full bg-primary transition-[width] duration-1000 ease-linear"
-					style:width="{progressPct}%"
-				></div>
-			</div>
+	{/if}
+	<div class="{bare ? '' : 'mt-3'} flex items-center gap-3">
+		{#if data?.albumArt}
+			<img src={data.albumArt} alt="" class="h-14 w-14 shrink-0 rounded-md object-cover" />
+		{:else}
+			<span class="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-surface-2">
+				<Music size={20} class="text-primary" aria-hidden="true" />
+			</span>
 		{/if}
+		<div class="min-w-0 flex-1">
+			<a
+				href={data?.url}
+				target="_blank"
+				rel="noreferrer"
+				class="link block truncate text-sm font-medium text-white hover:text-primary"
+			>
+				{data?.track}
+			</a>
+			<p class="truncate text-xs text-dim">{data?.artist}</p>
+			{#if history?.found}
+				<p class="mt-1 text-xs text-dim">
+					Played {history.plays} time{history.plays === 1 ? '' : 's'} before
+					{#if history.firstPlayedAt}
+						&middot; first in {formatDate(history.firstPlayedAt)}
+					{/if}
+				</p>
+			{/if}
+		</div>
 	</div>
+	{#if data?.durationMs}
+		<div class="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-2">
+			<div
+				class="h-full rounded-full bg-primary transition-[width] duration-1000 ease-linear"
+				style:width="{progressPct}%"
+			></div>
+		</div>
+	{/if}
+{/snippet}
+
+{#if data?.playing && data.track}
+	{#if bare}
+		{@render nowPlaying()}
+	{:else}
+		<div class="rounded-lg border border-border p-5 sm:p-6" data-hero-reveal="0">
+			{@render nowPlaying()}
+		</div>
+	{/if}
+{:else if fallback}
+	{@render fallback()}
 {/if}

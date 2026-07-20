@@ -2,7 +2,6 @@ import { getAllDevlogEntries } from '$lib/server/devlog';
 import { getAllProjects } from '$lib/server/projects';
 import { getListeningStats, getActiveDates, getRecentDailyPlayCounts } from '$lib/server/spotify-history';
 import { computeStreaks } from '$lib/server/listening-streaks';
-import { getCurrentlyPlaying, spotifyConfigured } from '$lib/server/spotify';
 import { getLibraryWithFallback, simklConfigured } from '$lib/server/simkl';
 import { getStatus } from '$lib/server/status-db';
 import type { PageServerLoad } from './$types';
@@ -23,16 +22,6 @@ export const load: PageServerLoad = async () => {
 		}
 	}
 
-	let nowPlaying = null;
-	if (spotifyConfigured()) {
-		try {
-			const current = await getCurrentlyPlaying();
-			nowPlaying = current.playing ? current : null;
-		} catch {
-			nowPlaying = null;
-		}
-	}
-
 	return {
 		// getAllDevlogEntries() is sorted oldest-first (prev/next math depends
 		// on that) — reverse before slicing so "Latest" means newest.
@@ -42,7 +31,6 @@ export const load: PageServerLoad = async () => {
 		currentStreak: streaks.current?.days ?? null,
 		recentDaily,
 		watching,
-		nowPlaying,
 		statusItems: status.items
 	};
 };

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DiscordPresence from '$lib/components/DiscordPresence.svelte';
 	import GithubActivity from '$lib/components/GithubActivity.svelte';
+	import ListeningNowCard from '$lib/components/ListeningNowCard.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ProjectCard from '$lib/components/ProjectCard.svelte';
 	import GithubIcon from '@icons-pack/svelte-simple-icons/icons/SiGithub';
@@ -101,28 +102,13 @@
 					<Music size={13} aria-hidden="true" /> Now playing
 				</h2>
 
-				{#if data.nowPlaying}
-					<a
-						href={data.nowPlaying.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="link mt-4 flex items-center gap-3"
-					>
-						{#if data.nowPlaying.albumArt}
-							<img
-								src={data.nowPlaying.albumArt}
-								alt=""
-								class="h-14 w-14 shrink-0 rounded-md object-cover"
-							/>
-						{/if}
-						<div class="min-w-0">
-							<p class="truncate text-sm font-medium text-white">{data.nowPlaying.track}</p>
-							<p class="truncate text-sm text-dim">{data.nowPlaying.artist}</p>
-						</div>
-					</a>
-				{:else}
-					<p class="mt-4 text-sm text-dim">Nothing playing right now.</p>
-				{/if}
+				<div class="mt-4">
+					<ListeningNowCard bare>
+						{#snippet fallback()}
+							<p class="text-sm text-dim">Nothing playing right now.</p>
+						{/snippet}
+					</ListeningNowCard>
+				</div>
 			</section>
 
 			<section class="card flex flex-1 flex-col rounded-lg border border-border bg-surface p-6" use:reveal>
