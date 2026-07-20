@@ -28,3 +28,5 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          SESSION_SECRET: test-session-secret
