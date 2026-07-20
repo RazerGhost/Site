@@ -22,7 +22,14 @@ export interface ProjectMeta {
 	href?: string;
 	live?: string;
 	cover?: string;
+	images: string[];
 	tags: string[];
+	stack: string[];
+	status: ProjectStatus;
+	featured: boolean;
+	readingTime: number;
+	searchText: string;
+	draft: boolean;
 	date: string;
 }
 ```

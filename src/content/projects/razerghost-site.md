@@ -38,11 +38,12 @@ pull from external APIs and degrade gracefully — they just quietly disappear
 or show a fallback state if their env vars or accounts aren't set up, rather
 than breaking the page.
 
-There's also a small private editing area behind GitHub login (`/notes`) —
-a notes graph, a status editor for the homepage's "Right now" card, and
-markdown editors for the devlog and this projects page itself, so posts can
-be drafted and previewed against a real dev server before being committed
-and pushed.
+There's also a small private area behind GitHub login: `/notes` for a
+personal notes graph — search, tags, folders, saved views — and `/admin`
+for the actual site-editing tools, a dashboard of markdown editors for the
+devlog and this projects page, a status editor for the homepage's "Right
+now" card, and a Simkl cache inspector. Posts get drafted and previewed
+against a real dev server before being committed and pushed.
 
 ## What's here
 

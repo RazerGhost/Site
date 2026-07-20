@@ -18,7 +18,7 @@ The export lands as a pile of JSON files, one play per entry — track, artist,
 album, timestamp, milliseconds played, the works. `spotify-history.ts`
 parses and normalizes them; `spotify-history-db.ts` writes the result into
 `spotify-history.db`, a SQLite file on the persistent data volume.
-`/spotify-import` (gated behind the same GitHub login as `/notes`) is where
+`/spotify-import` (gated behind the same GitHub login as `/admin`) is where
 the files actually get uploaded.
 
 Inserts are idempotent on `(played_at, spotify_uri, ms_played)`, which

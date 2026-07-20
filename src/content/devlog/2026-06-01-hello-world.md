@@ -22,7 +22,7 @@ const entries = getAllDevlogEntries();
 
 Some things worth noting:
 
-- No comments, no analytics, no auth
+- No comments, no analytics
 - Runs as a real Node server (SvelteKit + `adapter-node`), not a static export
 - Posts can embed real, interactive Svelte components — see below
 
