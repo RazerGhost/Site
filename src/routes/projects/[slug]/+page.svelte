@@ -6,6 +6,7 @@
 	import ShareButtons from '$lib/components/ShareButtons.svelte';
 	import TableOfContents from '$lib/components/TableOfContents.svelte';
 	import GithubRepoStats from '$lib/components/GithubRepoStats.svelte';
+	import Lightbox from '$lib/components/Lightbox.svelte';
 	import { site } from '$lib/config';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
@@ -19,6 +20,14 @@
 	const hasToc = $derived(data.project.toc.length > 1);
 
 	let contentEl: HTMLElement;
+
+	let lightboxOpen = $state(false);
+	let lightboxIndex = $state(0);
+
+	function openLightbox(i: number) {
+		lightboxIndex = i;
+		lightboxOpen = true;
+	}
 
 	$effect(() => {
 		// re-run whenever the rendered project body changes (e.g. navigating
@@ -139,10 +148,22 @@
 
 		{#if data.project.images.length}
 			<div class="mt-6 grid gap-3 sm:grid-cols-2">
-				{#each data.project.images as image}
-					<img src={image} alt="" class="aspect-video w-full rounded-lg object-cover" />
+				{#each data.project.images as image, i}
+					<button
+						type="button"
+						class="block"
+						aria-label="View screenshot {i + 1} larger"
+						onclick={() => openLightbox(i)}
+					>
+						<img
+							src={image}
+							alt=""
+							class="aspect-video w-full rounded-lg object-cover transition-opacity hover:opacity-85"
+						/>
+					</button>
 				{/each}
 			</div>
+			<Lightbox images={data.project.images} bind:open={lightboxOpen} bind:index={lightboxIndex} />
 		{/if}
 
 		<div class="mt-6">

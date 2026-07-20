@@ -1,6 +1,6 @@
 import { getAllDevlogEntries } from '$lib/server/devlog';
 import { getAllProjects } from '$lib/server/projects';
-import { getListeningStats, getActiveDates } from '$lib/server/spotify-history';
+import { getListeningStats, getActiveDates, getRecentDailyPlayCounts } from '$lib/server/spotify-history';
 import { computeStreaks } from '$lib/server/listening-streaks';
 import { getCurrentlyPlaying, spotifyConfigured } from '$lib/server/spotify';
 import { getLibraryWithFallback, simklConfigured } from '$lib/server/simkl';
@@ -10,6 +10,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async () => {
 	const listeningStats = getListeningStats();
 	const streaks = computeStreaks(getActiveDates());
+	const recentDaily = getRecentDailyPlayCounts(14);
 	const status = getStatus();
 
 	let watching = null;
@@ -37,9 +38,9 @@ export const load: PageServerLoad = async () => {
 		// on that) — reverse before slicing so "Latest" means newest.
 		latest: getAllDevlogEntries().toReversed().slice(0, 3),
 		projects: getAllProjects().slice(0, 3),
-		topTrack: listeningStats.topTracks[0] ?? null,
 		totalPlays: listeningStats.totalPlays,
 		currentStreak: streaks.current?.days ?? null,
+		recentDaily,
 		watching,
 		nowPlaying,
 		statusItems: status.items

@@ -106,6 +106,26 @@
         return Array.from({ length: 24 }, (_, hour) => byHour.get(hour) ?? 0);
     });
 
+    // --- Weekday x hour heatmap ---
+    const weekdayHourGrid = $derived.by(() => {
+        if (!data.weekdayHourly.length) return [];
+        const byKey = new Map(
+            data.weekdayHourly.map((d) => [`${d.weekday}:${d.hour}`, d.plays]),
+        );
+        const maxPlays = Math.max(1, ...data.weekdayHourly.map((d) => d.plays));
+        return Array.from({ length: 7 }, (_, weekday) => ({
+            weekday,
+            hours: Array.from({ length: 24 }, (_, hour) => {
+                const plays = byKey.get(`${weekday}:${hour}`) ?? 0;
+                const level =
+                    plays === 0
+                        ? 0
+                        : Math.min(4, Math.ceil((plays / maxPlays) * 4));
+                return { hour, plays, level };
+            }),
+        }));
+    });
+
     // --- Monthly trend ---
     const MONTH_NAMES = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -365,151 +385,107 @@
         </div>
 
         <div
-            class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+            class="mt-6 rounded-lg border border-border p-5 sm:p-6"
+            use:reveal
         >
+            <p class="text-xs font-medium uppercase tracking-wide text-dim">
+                Spent listening
+            </p>
+            <p class="mt-2 flex items-baseline gap-1.5 text-white">
+                <span class="text-4xl font-extrabold sm:text-5xl"
+                    >{listenTime.days}</span
+                >
+                <span class="text-sm text-dim">d</span>
+                <span class="text-4xl font-extrabold sm:text-5xl"
+                    >{listenTime.hours}</span
+                >
+                <span class="text-sm text-dim">h</span>
+                <span class="text-4xl font-extrabold sm:text-5xl"
+                    >{listenTime.minutes}</span
+                >
+                <span class="text-sm text-dim">m</span>
+            </p>
+
             <div
-                class="flex h-full flex-col rounded-lg border border-border p-5 sm:p-6"
-                use:reveal
+                class="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-5 text-center sm:grid-cols-3 lg:grid-cols-5"
             >
-                <p class="text-xs font-medium uppercase tracking-wide text-dim">
-                    Spent listening
-                </p>
-                <p class="mt-2 flex items-baseline gap-1.5 text-white">
-                    <span class="text-4xl font-extrabold sm:text-5xl"
-                        >{listenTime.days}</span
-                    >
-                    <span class="text-sm text-dim">d</span>
-                    <span class="text-4xl font-extrabold sm:text-5xl"
-                        >{listenTime.hours}</span
-                    >
-                    <span class="text-sm text-dim">h</span>
-                    <span class="text-4xl font-extrabold sm:text-5xl"
-                        >{listenTime.minutes}</span
-                    >
-                    <span class="text-sm text-dim">m</span>
-                </p>
-
-                <div
-                    class="mt-5 grid grid-cols-3 gap-4 border-t border-border pt-5 text-center"
-                >
-                    <div>
-                        <p class="text-xl font-bold text-white">
-                            {data.stats.totalPlays.toLocaleString()}
-                        </p>
-                        <p class="mt-0.5 text-xs text-dim">Total plays</p>
-                    </div>
-                    <div>
-                        <p class="text-xl font-bold text-white">
-                            {data.stats.peakYear ?? "—"}
-                        </p>
-                        <p class="mt-0.5 text-xs text-dim">Peak year</p>
-                    </div>
-                    <div>
-                        <p class="text-xl font-bold text-white">
-                            {data.stats.peakWeekday != null
-                                ? WEEKDAY_NAMES[data.stats.peakWeekday]
-                                : "—"}
-                        </p>
-                        <p class="mt-0.5 text-xs text-dim">Most active day</p>
-                    </div>
+                <div>
+                    <p class="text-xl font-bold text-white">
+                        {data.stats.totalPlays.toLocaleString()}
+                    </p>
+                    <p class="mt-0.5 text-xs text-dim">Total plays</p>
                 </div>
-
-                <div
-                    class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center"
-                >
-                    <div>
-                        <p class="text-xl font-bold text-white">
-                            {formatDate(data.stats.firstPlayedAt)}
-                        </p>
-                        <p class="mt-0.5 text-xs text-dim">Earliest play</p>
-                    </div>
-                    <div>
-                        <p class="text-xl font-bold text-white">
-                            {formatDate(data.stats.lastPlayedAt)}
-                        </p>
-                        <p class="mt-0.5 text-xs text-dim">Most recent play</p>
-                    </div>
+                <div>
+                    <p class="text-xl font-bold text-white">
+                        {data.stats.peakYear ?? "—"}
+                    </p>
+                    <p class="mt-0.5 text-xs text-dim">Peak year</p>
                 </div>
+                <div>
+                    <p class="text-xl font-bold text-white">
+                        {data.stats.peakWeekday != null
+                            ? WEEKDAY_NAMES[data.stats.peakWeekday]
+                            : "—"}
+                    </p>
+                    <p class="mt-0.5 text-xs text-dim">Most active day</p>
+                </div>
+                <div>
+                    <p class="text-xl font-bold text-white">
+                        {formatDate(data.stats.firstPlayedAt)}
+                    </p>
+                    <p class="mt-0.5 text-xs text-dim">Earliest play</p>
+                </div>
+                <div>
+                    <p class="text-xl font-bold text-white">
+                        {formatDate(data.stats.lastPlayedAt)}
+                    </p>
+                    <p class="mt-0.5 text-xs text-dim">Most recent play</p>
+                </div>
+            </div>
 
-                {#if data.skipShuffle.skipRate != null || data.skipShuffle.shuffleRate != null}
-                    <div
-                        class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center"
-                    >
+            {#if data.skipShuffle.skipRate != null || data.skipShuffle.shuffleRate != null || data.streaks.longest || data.streaks.current}
+                <div
+                    class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center sm:grid-cols-4"
+                >
+                    {#if data.skipShuffle.skipRate != null}
                         <div>
                             <p class="text-xl font-bold text-white">
-                                {data.skipShuffle.skipRate != null
-                                    ? `${Math.round(data.skipShuffle.skipRate)}%`
-                                    : "—"}
+                                {Math.round(data.skipShuffle.skipRate)}%
                             </p>
                             <p class="mt-0.5 text-xs text-dim">Skip rate</p>
                         </div>
+                    {/if}
+                    {#if data.skipShuffle.shuffleRate != null}
                         <div>
                             <p class="text-xl font-bold text-white">
-                                {data.skipShuffle.shuffleRate != null
-                                    ? `${Math.round(data.skipShuffle.shuffleRate)}%`
-                                    : "—"}
+                                {Math.round(data.skipShuffle.shuffleRate)}%
                             </p>
                             <p class="mt-0.5 text-xs text-dim">Shuffle plays</p>
                         </div>
-                    </div>
-                {/if}
-
-                {#if data.streaks.longest || data.streaks.current}
-                    <div
-                        class="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-center"
-                    >
+                    {/if}
+                    {#if data.streaks.longest}
                         <div>
                             <p class="text-xl font-bold text-white">
-                                {data.streaks.longest
-                                    ? `${data.streaks.longest.days} day${data.streaks.longest.days === 1 ? "" : "s"}`
-                                    : "—"}
+                                {data.streaks.longest.days} day{data.streaks.longest.days === 1 ? "" : "s"}
                             </p>
                             <p class="mt-0.5 text-xs text-dim">Longest streak</p>
                         </div>
+                    {/if}
+                    {#if data.streaks.current}
                         <div>
                             <p class="text-xl font-bold text-white">
-                                {data.streaks.current
-                                    ? `${data.streaks.current.days} day${data.streaks.current.days === 1 ? "" : "s"}`
-                                    : "—"}
+                                {data.streaks.current.days} day{data.streaks.current.days === 1 ? "" : "s"}
                             </p>
                             <p class="mt-0.5 text-xs text-dim">Current streak</p>
                         </div>
-                    </div>
-                {/if}
+                    {/if}
+                </div>
+            {/if}
+        </div>
 
-                {#if hourlyByHour.some((n) => n > 0)}
-                    <div
-                        class="mt-5 flex flex-1 flex-col justify-center border-t border-border pt-5"
-                    >
-                        <p
-                            class="text-xs font-medium uppercase tracking-wide text-dim"
-                        >
-                            Listening clock
-                        </p>
-                        <div class="mt-3 flex h-16 items-end gap-[3px]">
-                            {#each hourlyByHour as plays, hour}
-                                <div
-                                    class="flex-1 rounded-sm bg-primary/70"
-                                    style:height="{Math.max(
-                                        4,
-                                        (plays / maxHourly) * 100,
-                                    )}%"
-                                    title="{hour}:00 — {plays} plays"
-                                ></div>
-                            {/each}
-                        </div>
-                        <div
-                            class="mt-1 flex justify-between text-[10px] text-dim"
-                        >
-                            <span>12am</span>
-                            <span>12pm</span>
-                            <span>11pm</span>
-                        </div>
-                    </div>
-                {/if}
-            </div>
-
-            <div class="flex flex-col gap-4">
+        <div
+            class="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+        >
                 {#if data.stats.topArtists.length}
                     <div
                         class="rounded-lg border border-border p-5 sm:p-6"
@@ -694,8 +670,6 @@
                         </ul>
                     </div>
                 {/if}
-
-            </div>
         </div>
 
         {#if data.topAlbums.length || data.discoveries.length}
@@ -801,6 +775,34 @@
             </div>
         {/if}
 
+        {#if hourlyByHour.some((n) => n > 0)}
+            <div
+                class="mt-4 rounded-lg border border-border p-5 sm:p-6"
+                use:reveal
+            >
+                <p class="text-xs font-medium uppercase tracking-wide text-dim">
+                    Listening clock
+                </p>
+                <div class="mt-3 flex h-16 items-end gap-[3px]">
+                    {#each hourlyByHour as plays, hour}
+                        <div
+                            class="flex-1 rounded-sm bg-primary/70"
+                            style:height="{Math.max(
+                                4,
+                                (plays / maxHourly) * 100,
+                            )}%"
+                            title="{hour}:00 — {plays} plays"
+                        ></div>
+                    {/each}
+                </div>
+                <div class="mt-1 flex justify-between text-[10px] text-dim">
+                    <span>12am</span>
+                    <span>12pm</span>
+                    <span>11pm</span>
+                </div>
+            </div>
+        {/if}
+
         {#if monthlyBars.length}
             <div
                 class="mt-4 rounded-lg border border-border p-5 sm:p-6"
@@ -840,15 +842,15 @@
                 <p class="text-xs font-medium uppercase tracking-wide text-dim">
                     {data.selectedYear} activity
                 </p>
-                <div class="mt-3 flex gap-[3px] overflow-x-auto pb-1">
+                <div class="mt-3 flex gap-[3px] pb-1">
                     {#each heatmapWeeks as week}
-                        <div class="flex flex-col gap-[3px]">
+                        <div class="flex min-w-[3px] flex-1 flex-col gap-[3px]">
                             {#each week as day}
                                 {#if day.level === -1}
-                                    <div class="h-3 w-3"></div>
+                                    <div class="aspect-square w-full"></div>
                                 {:else}
                                     <div
-                                        class="h-3 w-3 rounded-sm"
+                                        class="aspect-square w-full rounded-sm"
                                         class:bg-surface-2={day.level === 0}
                                         class:bg-primary={day.level > 0}
                                         style:opacity={day.level > 0
@@ -860,6 +862,58 @@
                             {/each}
                         </div>
                     {/each}
+                </div>
+            </div>
+        {/if}
+
+        {#if weekdayHourGrid.length}
+            <div
+                class="mt-4 rounded-lg border border-border p-5 sm:p-6"
+                use:reveal
+            >
+                <p class="text-xs font-medium uppercase tracking-wide text-dim">
+                    Listening habits by day &amp; hour
+                </p>
+                <div class="mt-3 pb-1">
+                    <div class="flex flex-col gap-[3px]">
+                        {#each weekdayHourGrid as row}
+                            <div class="flex items-center gap-2">
+                                <span class="w-8 shrink-0 text-[10px] text-dim">
+                                    {WEEKDAY_NAMES[row.weekday].slice(0, 3)}
+                                </span>
+                                <div class="flex flex-1 gap-[3px]">
+                                    {#each row.hours as cell}
+                                        <div
+                                            class="aspect-square w-full min-w-[3px] flex-1 rounded-sm"
+                                            class:bg-surface-2={cell.level === 0}
+                                            class:bg-primary={cell.level > 0}
+                                            style:opacity={cell.level > 0
+                                                ? 0.25 + cell.level * 0.1875
+                                                : 1}
+                                            title="{WEEKDAY_NAMES[row.weekday]} {cell.hour}:00 — {cell.plays} plays"
+                                        ></div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+                <div class="mt-1 ml-10 flex justify-between text-[10px] text-dim">
+                    <span>12am</span>
+                    <span>12pm</span>
+                    <span>11pm</span>
+                </div>
+                <div class="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-dim">
+                    <span>Less</span>
+                    {#each [0, 1, 2, 3, 4] as level}
+                        <div
+                            class="h-3 w-3 rounded-sm"
+                            class:bg-surface-2={level === 0}
+                            class:bg-primary={level > 0}
+                            style:opacity={level > 0 ? 0.25 + level * 0.1875 : 1}
+                        ></div>
+                    {/each}
+                    <span>More</span>
                 </div>
             </div>
         {/if}

@@ -21,6 +21,22 @@
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 	}
+
+	// Last 14 days of daily play counts, zero-filled for days with no plays —
+	// powers the small sparkline next to the current streak.
+	const sparklineDays = $derived.by(() => {
+		const byDate = new Map(data.recentDaily.map((d) => [d.date, d.plays]));
+		const days: number[] = [];
+		const cursor = new Date();
+		cursor.setUTCDate(cursor.getUTCDate() - 13);
+		for (let i = 0; i < 14; i++) {
+			const key = cursor.toISOString().slice(0, 10);
+			days.push(byDate.get(key) ?? 0);
+			cursor.setUTCDate(cursor.getUTCDate() + 1);
+		}
+		return days;
+	});
+	const sparklineMax = $derived(Math.max(1, ...sparklineDays));
 </script>
 
 <Seo title={site.name} description={site.description} path="/" />
@@ -124,14 +140,23 @@
 					<p class="mt-1 text-xs text-dim">
 						current streak · {data.totalPlays.toLocaleString()} plays logged
 					</p>
-				{:else if data.topTrack}
-					<p class="mt-4 truncate text-sm font-medium text-white">{data.topTrack.track}</p>
-					<p class="truncate text-sm text-dim">{data.topTrack.artist}</p>
-					<p class="mt-3 text-xs text-dim">
-						{data.topTrack.plays} plays · top track · {data.totalPlays.toLocaleString()} plays logged
-					</p>
+				{:else if data.totalPlays}
+					<p class="mt-4 text-2xl font-bold text-white">{data.totalPlays.toLocaleString()}</p>
+					<p class="mt-1 text-xs text-dim">plays logged</p>
 				{:else}
 					<p class="mt-4 text-sm text-dim">No listening history imported yet.</p>
+				{/if}
+
+				{#if sparklineDays.some((n) => n > 0)}
+					<div class="mt-3 flex h-6 items-end gap-[2px]">
+						{#each sparklineDays as plays}
+							<div
+								class="flex-1 rounded-sm bg-primary/70"
+								style:height="{Math.max(8, (plays / sparklineMax) * 100)}%"
+							></div>
+						{/each}
+					</div>
+					<p class="mt-1 text-[10px] text-dim">Last 14 days</p>
 				{/if}
 			</section>
 

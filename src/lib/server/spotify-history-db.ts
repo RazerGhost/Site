@@ -203,6 +203,25 @@ export function getHeatmap(year: number): { date: string; plays: number }[] {
 	);
 }
 
+// Daily play counts for the last `days` calendar days (UTC, inclusive of
+// today) — sparse like getHeatmap, but a small rolling window rather than a
+// full year, for the homepage's recent-activity sparkline.
+export function getRecentDailyPlayCounts(days: number): { date: string; plays: number }[] {
+	const end = new Date();
+	const start = new Date(end);
+	start.setUTCDate(start.getUTCDate() - (days - 1));
+	const startDate = start.toISOString().slice(0, 10);
+	return memoized(`recentDaily:${days}:${startDate}`, () =>
+		getDb()
+			.prepare(
+				`SELECT date(played_at) as date, COUNT(*) as plays
+				 FROM plays WHERE played_at >= @start
+				 GROUP BY date ORDER BY date`
+			)
+			.all({ start: startDate }) as { date: string; plays: number }[]
+	);
+}
+
 // Play counts by hour-of-day (0-23), across all history — powers a listening-clock chart.
 export function getHourlyBreakdown(): { hour: number; plays: number }[] {
 	return memoized('hourly', () =>
@@ -213,6 +232,22 @@ export function getHourlyBreakdown(): { hour: number; plays: number }[] {
 			)
 			.all() as { hour: number; plays: number }[]
 	);
+}
+
+// Play counts by (weekday, hour-of-day) — powers a weekly listening-habits
+// heatmap. Sparse: combos with zero plays are simply absent from the result.
+export function getWeekdayHourBreakdown(opts: { year?: number } = {}): { weekday: number; hour: number; plays: number }[] {
+	return memoized(`weekdayHourly:${opts.year ?? 'all'}`, () => {
+		const yearFilter = opts.year != null ? `WHERE played_at >= @yearStart AND played_at < @yearEnd` : '';
+		const params = opts.year != null ? yearRange(opts.year) : {};
+		return getDb()
+			.prepare(
+				`SELECT CAST(strftime('%w', played_at) AS INTEGER) as weekday,
+				        CAST(strftime('%H', played_at) AS INTEGER) as hour, COUNT(*) as plays
+				 FROM plays ${yearFilter} GROUP BY weekday, hour`
+			)
+			.all(params) as { weekday: number; hour: number; plays: number }[];
+	});
 }
 
 export type TrackHistory = { plays: number; firstPlayedAt: string; lastPlayedAt: string };

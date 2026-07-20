@@ -3,6 +3,7 @@ import {
 	getAvailableYears,
 	getHeatmap,
 	getHourlyBreakdown,
+	getWeekdayHourBreakdown,
 	getOnThisDay,
 	getTopAlbums,
 	getSkipShuffleStats,
@@ -30,6 +31,7 @@ export const load: PageServerLoad = ({ url }) => {
 	const stats = getListeningStats(yearOpts);
 	const heatmap = year != null ? getHeatmap(year) : [];
 	const hourly = getHourlyBreakdown();
+	const weekdayHourly = getWeekdayHourBreakdown(yearOpts);
 	const topAlbums = getTopAlbums(yearOpts);
 	const skipShuffle = getSkipShuffleStats(yearOpts);
 	const monthlyTrend = getMonthlyTrend(yearOpts);
@@ -49,6 +51,7 @@ export const load: PageServerLoad = ({ url }) => {
 		selectedYear: year,
 		heatmap,
 		hourly,
+		weekdayHourly,
 		onThisDay,
 		topAlbums,
 		skipShuffle,
