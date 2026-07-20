@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { invalidateAll } from "$app/navigation";
+    import { invalidateAll, replaceState } from "$app/navigation";
+    import { page } from "$app/state";
     import { reveal } from "$lib/actions/reveal";
     import Seo from "$lib/components/Seo.svelte";
     import Tv from "@lucide/svelte/icons/tv";
@@ -25,18 +26,82 @@
 
     let { data }: { data: PageData } = $props();
 
+    type SortMode = "added" | "title" | "progress" | "rating";
+    type Group = "tv" | "anime";
+
+    const initialParams = page.url.searchParams;
+    const initialSortMode: SortMode = (["added", "title", "progress", "rating"] as const).includes(
+        initialParams.get("sort") as SortMode,
+    )
+        ? (initialParams.get("sort") as SortMode)
+        : "added";
+    const initialGroup: Group = initialParams.get("group") === "anime" ? "anime" : "tv";
+
     let retrying = $state(false);
-    let query = $state("");
-    let sortMode = $state<"added" | "title" | "progress">("added");
-    let selectedGenre = $state<string | null>(null);
-    let activeGroup = $state<"tv" | "anime">("tv");
+    let query = $state(initialParams.get("q") ?? "");
+    let sortMode = $state<SortMode>(initialSortMode);
+    let selectedGenre = $state<string | null>(initialParams.get("genre"));
+    let activeGroup = $state<Group>(initialGroup);
     let pickedItem = $state<LibraryItem | null>(null);
     let spinning = $state(false);
+
+    const PAGE_SIZE = 24;
+    type SectionKey = "watching" | "onHold" | "completed" | "dropped" | "planToWatch";
+    let visibleCounts = $state<Record<SectionKey, number>>({
+        watching: PAGE_SIZE,
+        onHold: PAGE_SIZE,
+        completed: PAGE_SIZE,
+        dropped: PAGE_SIZE,
+        planToWatch: PAGE_SIZE,
+    });
+
+    // A narrowed filter should always start from the first page rather than
+    // keeping whatever count was reached while scrolling a broader view.
+    $effect(() => {
+        query;
+        selectedGenre;
+        activeGroup;
+        sortMode;
+        visibleCounts = {
+            watching: PAGE_SIZE,
+            onHold: PAGE_SIZE,
+            completed: PAGE_SIZE,
+            dropped: PAGE_SIZE,
+            planToWatch: PAGE_SIZE,
+        };
+    });
+
+    function showMore(key: SectionKey) {
+        visibleCounts[key] += PAGE_SIZE;
+    }
 
     function switchGroup(group: "tv" | "anime") {
         activeGroup = group;
         selectedGenre = null;
     }
+
+    // Keep the URL in sync with the filter state so a filtered view is
+    // reload-safe and shareable — replaceState only (no goto), since these
+    // filters are applied entirely client-side over already-loaded data and
+    // shouldn't trigger a server round-trip.
+    $effect(() => {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        if (selectedGenre) params.set("genre", selectedGenre);
+        if (activeGroup !== "tv") params.set("group", activeGroup);
+        if (sortMode !== "added") params.set("sort", sortMode);
+        const search = params.toString() ? `?${params.toString()}` : "";
+        // Skip when it's already correct (true on mount, since filter state is seeded
+        // from the URL) — calling replaceState this early can throw "router is not
+        // initialized yet" on a hard reload/direct load, which would otherwise permanently
+        // kill this effect since an uncaught error stops it from ever re-running.
+        if (search === location.search) return;
+        try {
+            replaceState(`${location.pathname}${search}`, {});
+        } catch {
+            // router not ready yet — safe to ignore, see above
+        }
+    });
 
     function inGroup(item: LibraryItem, group: "tv" | "anime"): boolean {
         return group === "anime"
@@ -63,7 +128,9 @@
         const genre = selectedGenre;
         const filtered = items.filter((item) => {
             const matchesQuery =
-                !needle || item.title.toLowerCase().includes(needle);
+                !needle ||
+                item.title.toLowerCase().includes(needle) ||
+                item.genres.some((g) => g.toLowerCase().includes(needle));
             const matchesGenre = !genre || item.genres.includes(genre);
             return matchesQuery && matchesGenre;
         });
@@ -73,6 +140,8 @@
             sorted.sort((a, b) => a.title.localeCompare(b.title));
         } else if (sortMode === "progress") {
             sorted.sort((a, b) => progressRatio(b) - progressRatio(a));
+        } else if (sortMode === "rating") {
+            sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
         } else {
             sorted.sort((a, b) =>
                 a.addedAt < b.addedAt ? 1 : a.addedAt > b.addedAt ? -1 : 0,
@@ -375,6 +444,25 @@
     </div>
 {/snippet}
 
+{#snippet section(key: SectionKey, items: LibraryItem[], emptyFallback: string)}
+    {#if items.length === 0}
+        <p class="mt-4 text-sm text-dim">{emptyMessage(emptyFallback)}</p>
+    {:else}
+        {@render grid(items.slice(0, visibleCounts[key]))}
+        {#if items.length > visibleCounts[key]}
+            <div class="mt-6 flex justify-center">
+                <button
+                    type="button"
+                    onclick={() => showMore(key)}
+                    class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-white transition-colors hover:border-primary"
+                >
+                    Show {Math.min(PAGE_SIZE, items.length - visibleCounts[key])} more
+                </button>
+            </div>
+        {/if}
+    {/if}
+{/snippet}
+
 <Seo
     title="Watchlist — RazerGhost"
     description="Shows, movies, and anime I'm watching, have finished, and plan to watch."
@@ -647,6 +735,7 @@
                 <option value="added">Recently added</option>
                 <option value="title">Title (A–Z)</option>
                 <option value="progress">Progress</option>
+                <option value="rating">Rating</option>
             </select>
         </div>
 
@@ -793,13 +882,7 @@
 
         <section class="mt-10">
             <h2 class="text-lg font-semibold text-white">Watching</h2>
-            {#if filteredWatching.length === 0}
-                <p class="mt-4 text-sm text-dim">
-                    {emptyMessage("Nothing in progress right now.")}
-                </p>
-            {:else}
-                {@render grid(filteredWatching)}
-            {/if}
+            {@render section("watching", filteredWatching, "Nothing in progress right now.")}
         </section>
 
         {#if groupOnHold.length > 0}
@@ -807,13 +890,7 @@
                 <h2 class="text-lg font-semibold text-white">
                     On Hold <span class="text-dim">({groupOnHold.length})</span>
                 </h2>
-                {#if filteredOnHold.length === 0}
-                    <p class="mt-4 text-sm text-dim">
-                        {emptyMessage("Nothing on hold.")}
-                    </p>
-                {:else}
-                    {@render grid(filteredOnHold)}
-                {/if}
+                {@render section("onHold", filteredOnHold, "Nothing on hold.")}
             </section>
         {/if}
 
@@ -822,13 +899,7 @@
                 Completed <span class="text-dim">({groupCompleted.length})</span
                 >
             </h2>
-            {#if filteredCompleted.length === 0}
-                <p class="mt-4 text-sm text-dim">
-                    {emptyMessage("Nothing finished yet.")}
-                </p>
-            {:else}
-                {@render grid(filteredCompleted)}
-            {/if}
+            {@render section("completed", filteredCompleted, "Nothing finished yet.")}
         </section>
 
         {#if groupDropped.length > 0}
@@ -837,13 +908,7 @@
                     Dropped <span class="text-dim">({groupDropped.length})</span
                     >
                 </h2>
-                {#if filteredDropped.length === 0}
-                    <p class="mt-4 text-sm text-dim">
-                        {emptyMessage("Nothing dropped.")}
-                    </p>
-                {:else}
-                    {@render grid(filteredDropped)}
-                {/if}
+                {@render section("dropped", filteredDropped, "Nothing dropped.")}
             </section>
         {/if}
 
@@ -853,13 +918,7 @@
                     >({groupPlanToWatch.length})</span
                 >
             </h2>
-            {#if filteredPlanToWatch.length === 0}
-                <p class="mt-4 text-sm text-dim">
-                    {emptyMessage("Nothing queued up.")}
-                </p>
-            {:else}
-                {@render grid(filteredPlanToWatch)}
-            {/if}
+            {@render section("planToWatch", filteredPlanToWatch, "Nothing queued up.")}
         </section>
     {/if}
 </main>
