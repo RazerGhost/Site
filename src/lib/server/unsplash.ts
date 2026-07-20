@@ -1,17 +1,15 @@
 import { env } from '$env/dynamic/private';
+import { getPhotoCache, setPhotoCache, type CachedPhoto } from '$lib/server/newtab-settings';
 
 const REFRESH_MS = 60 * 60 * 1000;
 const DEFAULT_QUERY = 'minimal dark abstract';
 
-export interface UnsplashPhoto {
-	url: string;
-	photographerName: string;
-	photographerProfileUrl: string;
-	photoPageUrl: string;
-}
+export type UnsplashPhoto = CachedPhoto;
 
-// Cache is keyed by query too — changing the query (via the /newtab settings
-// panel) invalidates immediately rather than waiting out the hourly TTL.
+// In-memory cache is the fast path (no DB hit per request); the DB-backed
+// cache in newtab-settings.ts is the durable fallback so a server restart
+// (every redeploy, and frequent during local dev) doesn't force an immediate
+// re-fetch and eat into Unsplash's 50-requests/hour demo quota.
 let cached: { photo: UnsplashPhoto; query: string; fetchedAt: number } | null = null;
 let inflight: Promise<UnsplashPhoto | null> | null = null;
 
@@ -29,6 +27,19 @@ function withUtm(url: string): string {
 	const withParams = new URL(url);
 	withParams.searchParams.set('utm_source', 'razerghost-newtab');
 	withParams.searchParams.set('utm_medium', 'referral');
+	return withParams.toString();
+}
+
+// `urls.regular` is capped at 1080px wide — noticeably soft as a full-screen
+// background. `urls.raw` is the unprocessed source (Imgix-backed), so we
+// request it at a sensible desktop-background size/quality ourselves rather
+// than the pre-baked "regular" crop.
+function backgroundUrl(rawUrl: string): string {
+	const withParams = new URL(rawUrl);
+	withParams.searchParams.set('w', '2400');
+	withParams.searchParams.set('q', '85');
+	withParams.searchParams.set('fm', 'jpg');
+	withParams.searchParams.set('fit', 'max');
 	return withParams.toString();
 }
 
@@ -50,7 +61,7 @@ async function fetchRandomPhoto(query: string): Promise<UnsplashPhoto | null> {
 	}
 
 	return {
-		url: withUtm(body.urls.regular),
+		url: withUtm(backgroundUrl(body.urls.raw)),
 		photographerName: body.user.name,
 		photographerProfileUrl: withUtm(body.user.links.html),
 		photoPageUrl: withUtm(body.links.html)
@@ -63,10 +74,25 @@ export async function getBackgroundPhoto(query: string): Promise<UnsplashPhoto |
 	const now = Date.now();
 	if (cached && cached.query === query && now - cached.fetchedAt < REFRESH_MS) return cached.photo;
 
+	// Fall back to the DB-persisted cache before hitting the API — covers the
+	// case where this server process just started (restart/redeploy) but the
+	// hour hasn't actually elapsed yet.
+	if (!cached) {
+		const persisted = getPhotoCache();
+		if (persisted && persisted.query === query && now - persisted.fetchedAt < REFRESH_MS) {
+			cached = persisted;
+			return persisted.photo;
+		}
+	}
+
 	if (!inflight) {
 		inflight = fetchRandomPhoto(query)
 			.then((photo) => {
-				if (photo) cached = { photo, query, fetchedAt: Date.now() };
+				if (photo) {
+					const entry = { photo, query, fetchedAt: Date.now() };
+					cached = entry;
+					setPhotoCache(entry);
+				}
 				return photo;
 			})
 			.catch(() => null)
