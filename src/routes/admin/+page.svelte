@@ -6,6 +6,8 @@
 	import Activity from '@lucide/svelte/icons/activity';
 	import Music from '@lucide/svelte/icons/music';
 	import Database from '@lucide/svelte/icons/database';
+	import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
+	import Image from '@lucide/svelte/icons/image';
 	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 
 	const tools = [
@@ -44,6 +46,18 @@
 			href: '/admin/watchlist-cache',
 			icon: Database,
 			description: 'Inspect and force-refresh cached Simkl genre/synopsis/runtime rows.'
+		},
+		{
+			label: 'Backups',
+			href: '/admin/backups',
+			icon: ArchiveRestore,
+			description: 'Check when the data volume last backed up, or trigger one manually.'
+		},
+		{
+			label: 'Media library',
+			href: '/admin/media',
+			icon: Image,
+			description: 'Upload and browse images for devlog/project covers, galleries, and posts.'
 		}
 	];
 </script>

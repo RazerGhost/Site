@@ -83,6 +83,10 @@ Rotating this value invalidates all existing sessions.
 - `NOTES_DB_PATH` — optional, path to the SQLite file backing `/notes` ([notes.ts](../src/lib/server/notes.ts)). Defaults to `./data/notes.db` if unset. In production this must point inside a Coolify persistent volume mount so notes survive redeploys — do not leave it on the container's ephemeral filesystem.
 - `NOTES_ATTACHMENTS_DIR` — optional, directory holding images pasted/uploaded into note bodies ([+server.ts](../src/routes/api/notes/attachments/+server.ts)). Defaults to `./data/note-attachments` if unset. Point this at the same persistent Coolify volume as `NOTES_DB_PATH` — losing it breaks any note that embeds an image.
 
+## `MEDIA_DIR`
+
+Optional, directory holding images uploaded through the `/admin/media` library ([media.ts](../src/lib/server/media.ts)), used for devlog/project cover images, galleries, and post bodies. Defaults to `./data/media` if unset. Unlike `NOTES_ATTACHMENTS_DIR`, files here are served publicly (no login required) since they appear on public devlog/project pages — only uploading and deleting are admin-gated. Point this at the same persistent Coolify volume as the other `data/*` paths — losing it breaks any published post/project referencing an uploaded image.
+
 ## `SIMKL_CACHE_DB_PATH`
 
 Optional — path to the SQLite cache backing the Watching page's genre/synopsis enrichment ([simkl-cache.ts](../src/lib/server/simkl-cache.ts)). Defaults to `./data/simkl-cache.db` if unset. Unlike `NOTES_DB_PATH` above, losing this file isn't destructive — it just goes cold and re-warms itself over the next several page loads — but pointing it at the same Coolify persistent volume as `NOTES_DB_PATH` (i.e. leaving both unset, so they share `./data`) avoids that cold start on every redeploy.

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { marked } from 'marked';
 	import { untrack } from 'svelte';
+	import { enhance } from '$app/forms';
 	import Seo from '$lib/components/Seo.svelte';
+	import MediaPicker from '$lib/components/MediaPicker.svelte';
 	import type { PageProps } from './$types';
 
 	let { form }: PageProps = $props();
@@ -9,8 +11,51 @@
 	const today = new Date().toISOString().slice(0, 10);
 
 	let body = $state(untrack(() => form?.body ?? ''));
+	let cover = $state(untrack(() => form?.cover ?? ''));
+	let images = $state(untrack(() => form?.images ?? ''));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
+
+	let saving = $state(false);
+	let coverPickerOpen = $state(false);
+	let galleryPickerOpen = $state(false);
+	let bodyTextareaEl: HTMLTextAreaElement | undefined = $state();
+
+	function addGalleryImages(urls: string[]) {
+		if (urls.length === 0) return;
+		images = images ? `${images}, ${urls.join(', ')}` : urls.join(', ');
+	}
+
+	async function insertImage(file: File) {
+		const fd = new FormData();
+		fd.set('file', file);
+		const res = await fetch('/api/media', { method: 'POST', body: fd });
+		if (!res.ok) return;
+		const { url } = await res.json();
+		const markdown = `![](${url})`;
+		if (bodyTextareaEl) {
+			const start = bodyTextareaEl.selectionStart ?? body.length;
+			const end = bodyTextareaEl.selectionEnd ?? body.length;
+			body = body.slice(0, start) + markdown + body.slice(end);
+		} else {
+			body += markdown;
+		}
+	}
+
+	function onBodyPaste(e: ClipboardEvent) {
+		const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'));
+		if (!item) return;
+		e.preventDefault();
+		const file = item.getAsFile();
+		if (file) insertImage(file);
+	}
+
+	function onBodyDrop(e: DragEvent) {
+		const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'));
+		if (!file) return;
+		e.preventDefault();
+		insertImage(file);
+	}
 </script>
 
 <Seo title="New project — RazerGhost" description="Private projects editor." path="/admin/projects/new" noindex />
@@ -18,7 +63,17 @@
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">New project</h1>
 
-	<form method="POST" class="mt-8 flex flex-col gap-4">
+	<form
+		method="POST"
+		class="mt-8 flex flex-col gap-4"
+		use:enhance={() => {
+			saving = true;
+			return async ({ update }) => {
+				await update();
+				saving = false;
+			};
+		}}
+	>
 		{#if form?.error}
 			<p class="text-sm text-red-400">{form.error}</p>
 		{/if}
@@ -83,21 +138,39 @@
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
-		<input
-			type="text"
-			name="cover"
-			placeholder="Cover image path (optional)"
-			value={form?.cover ?? ''}
-			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-		/>
+		<div class="flex gap-2">
+			<input
+				type="text"
+				name="cover"
+				placeholder="Cover image path (optional)"
+				bind:value={cover}
+				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+			/>
+			<button
+				type="button"
+				onclick={() => (coverPickerOpen = true)}
+				class="link shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
+			>
+				Browse…
+			</button>
+		</div>
 
-		<input
-			type="text"
-			name="images"
-			placeholder="Gallery image paths (comma separated, optional)"
-			value={form?.images ?? ''}
-			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-		/>
+		<div class="flex gap-2">
+			<input
+				type="text"
+				name="images"
+				placeholder="Gallery image paths (comma separated, optional)"
+				bind:value={images}
+				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+			/>
+			<button
+				type="button"
+				onclick={() => (galleryPickerOpen = true)}
+				class="link shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
+			>
+				Add image…
+			</button>
+		</div>
 
 		<div class="flex items-center gap-4">
 			<select
@@ -143,7 +216,11 @@
 
 		<textarea
 			name="body"
+			bind:this={bodyTextareaEl}
 			bind:value={body}
+			onpaste={onBodyPaste}
+			ondrop={onBodyDrop}
+			ondragover={(e) => e.preventDefault()}
 			placeholder="Write something..."
 			rows="16"
 			hidden={mode === 'preview'}
@@ -158,9 +235,10 @@
 		<div class="flex gap-3">
 			<button
 				type="submit"
-				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+				disabled={saving}
+				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
 			>
-				Save
+				{saving ? 'Saving…' : 'Save'}
 			</button>
 			<a
 				href="/admin/projects"
@@ -171,3 +249,6 @@
 		</div>
 	</form>
 </main>
+
+<MediaPicker bind:open={coverPickerOpen} onselect={(url) => (cover = url)} />
+<MediaPicker bind:open={galleryPickerOpen} onselectMultiple={addGalleryImages} />

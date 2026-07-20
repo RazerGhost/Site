@@ -1,14 +1,69 @@
 <script lang="ts">
 	import { marked } from 'marked';
 	import { untrack } from 'svelte';
+	import { enhance } from '$app/forms';
 	import Seo from '$lib/components/Seo.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import MediaPicker from '$lib/components/MediaPicker.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
 	let body = $state(untrack(() => form?.body ?? data.body));
+	let cover = $state(untrack(() => form?.cover ?? data.cover));
+	let images = $state(untrack(() => form?.images ?? data.images));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
+
+	let saving = $state(false);
+	let saved = $state(false);
+	let confirmingDelete = $state(false);
+	let savedTimeout: ReturnType<typeof setTimeout> | undefined;
+	let coverPickerOpen = $state(false);
+	let galleryPickerOpen = $state(false);
+	let bodyTextareaEl: HTMLTextAreaElement | undefined = $state();
+
+	function flashSaved() {
+		saved = true;
+		clearTimeout(savedTimeout);
+		savedTimeout = setTimeout(() => (saved = false), 3000);
+	}
+
+	function addGalleryImages(urls: string[]) {
+		if (urls.length === 0) return;
+		images = images ? `${images}, ${urls.join(', ')}` : urls.join(', ');
+	}
+
+	async function insertImage(file: File) {
+		const fd = new FormData();
+		fd.set('file', file);
+		const res = await fetch('/api/media', { method: 'POST', body: fd });
+		if (!res.ok) return;
+		const { url } = await res.json();
+		const markdown = `![](${url})`;
+		if (bodyTextareaEl) {
+			const start = bodyTextareaEl.selectionStart ?? body.length;
+			const end = bodyTextareaEl.selectionEnd ?? body.length;
+			body = body.slice(0, start) + markdown + body.slice(end);
+		} else {
+			body += markdown;
+		}
+	}
+
+	function onBodyPaste(e: ClipboardEvent) {
+		const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'));
+		if (!item) return;
+		e.preventDefault();
+		const file = item.getAsFile();
+		if (file) insertImage(file);
+	}
+
+	function onBodyDrop(e: DragEvent) {
+		const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'));
+		if (!file) return;
+		e.preventDefault();
+		insertImage(file);
+	}
 </script>
 
 <Seo title="Edit {data.name} — RazerGhost" description="Private projects editor." path="/admin/projects/{data.slug}" noindex />
@@ -16,9 +71,24 @@
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit project</h1>
 
-	<form method="POST" action="?/update" class="mt-8 flex flex-col gap-4">
+	<form
+		method="POST"
+		action="?/update"
+		class="mt-8 flex flex-col gap-4"
+		use:enhance={() => {
+			saving = true;
+			return async ({ result, update }) => {
+				await update();
+				saving = false;
+				if (result.type === 'redirect') flashSaved();
+			};
+		}}
+	>
 		{#if form?.error}
 			<p class="text-sm text-red-400">{form.error}</p>
+		{/if}
+		{#if saved}
+			<p class="text-sm text-primary">Saved to disk. Commit + push in this repo to publish.</p>
 		{/if}
 
 		<input
@@ -81,21 +151,39 @@
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
-		<input
-			type="text"
-			name="cover"
-			placeholder="Cover image path (optional)"
-			value={form?.cover ?? data.cover}
-			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-		/>
+		<div class="flex gap-2">
+			<input
+				type="text"
+				name="cover"
+				placeholder="Cover image path (optional)"
+				bind:value={cover}
+				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+			/>
+			<button
+				type="button"
+				onclick={() => (coverPickerOpen = true)}
+				class="link shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
+			>
+				Browse…
+			</button>
+		</div>
 
-		<input
-			type="text"
-			name="images"
-			placeholder="Gallery image paths (comma separated, optional)"
-			value={form?.images ?? data.images}
-			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-		/>
+		<div class="flex gap-2">
+			<input
+				type="text"
+				name="images"
+				placeholder="Gallery image paths (comma separated, optional)"
+				bind:value={images}
+				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
+			/>
+			<button
+				type="button"
+				onclick={() => (galleryPickerOpen = true)}
+				class="link shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
+			>
+				Add image…
+			</button>
+		</div>
 
 		<div class="flex items-center gap-4">
 			<select
@@ -141,7 +229,11 @@
 
 		<textarea
 			name="body"
+			bind:this={bodyTextareaEl}
 			bind:value={body}
+			onpaste={onBodyPaste}
+			ondrop={onBodyDrop}
+			ondragover={(e) => e.preventDefault()}
 			rows="16"
 			hidden={mode === 'preview'}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
@@ -155,9 +247,10 @@
 		<div class="flex gap-3">
 			<button
 				type="submit"
-				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+				disabled={saving}
+				class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
 			>
-				Save
+				{saving ? 'Saving…' : 'Save'}
 			</button>
 			<a
 				href="/projects/{data.slug}"
@@ -175,14 +268,22 @@
 		</div>
 	</form>
 
-	<form
-		method="POST"
-		action="?/delete"
-		class="mt-8"
-		onsubmit={(e) => {
-			if (!confirm(`Delete "${data.name}"?`)) e.preventDefault();
-		}}
-	>
-		<button type="submit" class="link text-xs text-dim hover:text-red-400">Delete this project</button>
+	<form method="POST" action="?/delete" class="mt-8" id="delete-form">
+		<button
+			type="button"
+			onclick={() => (confirmingDelete = true)}
+			class="link text-xs text-dim hover:text-red-400"
+		>
+			Delete this project
+		</button>
 	</form>
 </main>
+
+<ConfirmDialog
+	bind:open={confirmingDelete}
+	title={`Delete "${data.name}"?`}
+	onconfirm={() => (document.getElementById('delete-form') as HTMLFormElement).requestSubmit()}
+/>
+
+<MediaPicker bind:open={coverPickerOpen} onselect={(url) => (cover = url)} />
+<MediaPicker bind:open={galleryPickerOpen} onselectMultiple={addGalleryImages} />

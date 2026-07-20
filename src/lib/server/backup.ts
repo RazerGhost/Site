@@ -1,5 +1,126 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
+import { env } from '$env/dynamic/private';
+
+const run = promisify(execFile);
+
+const DBS: { name: string; envVar: string; defaultFile: string }[] = [
+	{ name: 'notes', envVar: 'NOTES_DB_PATH', defaultFile: 'notes.db' },
+	{ name: 'simkl-cache', envVar: 'SIMKL_CACHE_DB_PATH', defaultFile: 'simkl-cache.db' },
+	{ name: 'spotify-history', envVar: 'SPOTIFY_HISTORY_DB_PATH', defaultFile: 'spotify-history.db' },
+	{ name: 'status', envVar: 'STATUS_DB_PATH', defaultFile: 'status.db' }
+];
+
+function dbPath(envVar: string, defaultFile: string): string {
+	return env[envVar] || path.join(process.cwd(), 'data', defaultFile);
+}
+
+async function git(args: string[], cwd: string) {
+	return run('git', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+}
+
+export type BackupResult =
+	| { committed: true; dbs: string[]; timestamp: string }
+	| { committed: false; dbs: string[]; message: string };
+
+// Backs up the persistent-volume state (the four SQLite DBs, dumped as text
+// so they diff cleanly in git — see dumpDatabaseToSql below — plus note
+// attachments and the media library) to a private git repo. Called from the
+// schedule-gated /api/backup endpoint and from the admin "run backup now"
+// button.
+export async function runBackup(): Promise<BackupResult> {
+	const remote = env.BACKUP_GIT_REMOTE;
+	if (!remote) throw new Error('BACKUP_GIT_REMOTE not configured');
+	const branch = env.BACKUP_GIT_BRANCH || 'main';
+	const userName = env.BACKUP_GIT_USER_NAME || 'ghostbase backup';
+	const userEmail = env.BACKUP_GIT_USER_EMAIL || 'backup@localhost';
+
+	const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostbase-backup-'));
+
+	try {
+		try {
+			await git(['clone', '--quiet', '--depth', '1', '--branch', branch, remote, workDir], os.tmpdir());
+		} catch {
+			// Branch doesn't exist yet (first-ever run against an empty repo).
+			await git(['clone', '--quiet', remote, workDir], os.tmpdir());
+			await git(['checkout', '--orphan', branch], workDir);
+			await git(['rm', '--quiet', '-rf', '--ignore-unmatch', '.'], workDir);
+		}
+
+		const dumped: string[] = [];
+		for (const { name, envVar, defaultFile } of DBS) {
+			const sql = dumpDatabaseToSql(dbPath(envVar, defaultFile));
+			if (sql === null) continue;
+			fs.writeFileSync(path.join(workDir, `${name}.sql`), sql);
+			dumped.push(name);
+		}
+
+		const attachmentsSrc =
+			env.NOTES_ATTACHMENTS_DIR || path.join(process.cwd(), 'data', 'note-attachments');
+		const attachmentsDest = path.join(workDir, 'note-attachments');
+		fs.rmSync(attachmentsDest, { recursive: true, force: true });
+		if (fs.existsSync(attachmentsSrc)) {
+			fs.cpSync(attachmentsSrc, attachmentsDest, { recursive: true });
+		}
+
+		const mediaSrc = env.MEDIA_DIR || path.join(process.cwd(), 'data', 'media');
+		const mediaDest = path.join(workDir, 'media');
+		fs.rmSync(mediaDest, { recursive: true, force: true });
+		if (fs.existsSync(mediaSrc)) {
+			fs.cpSync(mediaSrc, mediaDest, { recursive: true });
+		}
+
+		await git(['add', '-A'], workDir);
+		const { stdout: status } = await git(['status', '--porcelain'], workDir);
+		if (status.trim() === '') {
+			return { committed: false, dbs: dumped, message: 'No changes since last backup' };
+		}
+
+		await git(
+			['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '--quiet', '-m', `backup: ${new Date().toISOString()}`],
+			workDir
+		);
+		await git(['push', '--quiet', 'origin', `HEAD:${branch}`], workDir);
+
+		return { committed: true, dbs: dumped, timestamp: new Date().toISOString() };
+	} finally {
+		fs.rmSync(workDir, { recursive: true, force: true });
+	}
+}
+
+// Whether the backup pipeline has enough config to run at all — used to
+// gate the admin UI without requiring BACKUP_SECRET (that only guards the
+// scheduled HTTP endpoint, not same-origin admin actions).
+export function backupConfigured(): boolean {
+	return Boolean(env.BACKUP_GIT_REMOTE);
+}
+
+// Reads the last commit on the backup branch (a shallow clone, since that's
+// the cheapest way to ask a remote "when did you last change" over plain
+// git) to show a "last backup" timestamp in the admin UI without needing
+// any new persistent state of our own.
+export async function getLastBackupInfo(): Promise<{ timestamp: string; message: string } | null> {
+	const remote = env.BACKUP_GIT_REMOTE;
+	if (!remote) return null;
+	const branch = env.BACKUP_GIT_BRANCH || 'main';
+
+	const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostbase-backup-check-'));
+	try {
+		await git(['clone', '--quiet', '--depth', '1', '--branch', branch, remote, workDir], os.tmpdir());
+		const { stdout } = await git(['log', '-1', '--format=%cI%x1f%s'], workDir);
+		const [timestamp, message] = stdout.trim().split('\x1f');
+		if (!timestamp) return null;
+		return { timestamp, message: message ?? '' };
+	} catch {
+		return null;
+	} finally {
+		fs.rmSync(workDir, { recursive: true, force: true });
+	}
+}
 
 // Dumps a SQLite file to plain-text SQL (schema + INSERT statements), the
 // same shape `sqlite3 <file> .dump` produces. Used for git-based backups:

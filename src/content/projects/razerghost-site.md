@@ -1,15 +1,20 @@
 ---
 name: RazerGhost
 description: A personal link hub and devlog — the site you're looking at right now.
-href: https://github.com/RazerGhost/ghostbase
-live: https://razerghost.xyz
-tags: [sveltekit]
-stack: [sveltekit, tailwind, self-hosted]
+href: 'https://github.com/RazerGhost/ghostbase'
+live: 'https://razerghost.xyz'
+tags:
+  - sveltekit
+stack:
+  - sveltekit
+  - tailwind
+  - self-hosted
+images: []
 status: active
 featured: true
-date: 2026-07-18
+draft: false
+date: '2026-07-18'
 ---
-
 The site you're reading this on. A small, personal corner of the internet —
 somewhere to point people instead of a dozen separate profiles, and a running
 log of whatever I'm building at the moment.
