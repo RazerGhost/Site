@@ -34,9 +34,13 @@ export {
 //     master_metadata_album_artist_name, master_metadata_album_album_name,
 //     spotify_track_uri
 //   - older ("endsong_N.json"): endTime, msPlayed, trackName, artistName
-// Podcast episodes (no track/artist metadata) and zero-length entries are
-// skipped — this page is about music listening, same scope as Watchlist
-// being TV/movies/anime rather than every Simkl media type.
+// Podcast episodes (no track/artist metadata) are skipped — this page is
+// about music listening, same scope as Watchlist being TV/movies/anime
+// rather than every Simkl media type. Plays under MIN_MS_PLAYED are also
+// dropped, matching stats.fm's behavior of not counting accidental
+// taps/scroll-skips as real listens.
+const MIN_MS_PLAYED = 3000;
+
 function parseEntries(raw: unknown): PlayRecord[] {
 	if (!Array.isArray(raw)) return [];
 
@@ -54,7 +58,7 @@ function parseEntries(raw: unknown): PlayRecord[] {
 		const artist = e.master_metadata_album_artist_name ?? e.artistName;
 
 		if (typeof playedAtRaw !== 'string' || !playedAtRaw) continue;
-		if (typeof msPlayed !== 'number' || msPlayed <= 0) continue;
+		if (typeof msPlayed !== 'number' || msPlayed < MIN_MS_PLAYED) continue;
 		if (typeof track !== 'string' || !track) continue;
 		if (typeof artist !== 'string' || !artist) continue;
 
