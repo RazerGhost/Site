@@ -112,11 +112,11 @@ export const actions: Actions = {
 			});
 		}
 
-		redirect(303, `/notes/projects/${params.slug}`);
+		redirect(303, `/admin/projects/${params.slug}`);
 	},
 
 	delete: async ({ params }) => {
 		deleteEntry(CONTENT_DIR, params.slug);
-		redirect(303, '/notes/projects');
+		redirect(303, '/admin/projects');
 	}
 };

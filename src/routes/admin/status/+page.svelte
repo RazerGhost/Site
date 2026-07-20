@@ -1,13 +1,14 @@
 <script lang="ts">
 	import Seo from '$lib/components/Seo.svelte';
+	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
-	const initialItems = (form?.items ?? data.items.join('\n')) as string;
+	const initialItems = untrack(() => (form?.items ?? data.items.join('\n')) as string);
 </script>
 
-<Seo title="Status editor — RazerGhost" description="Private status editor." path="/notes/status" noindex />
+<Seo title="Status editor — RazerGhost" description="Private status editor." path="/admin/status" noindex />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit status</h1>

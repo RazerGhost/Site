@@ -73,6 +73,6 @@ export const actions: Actions = {
 			body
 		);
 
-		redirect(303, `/notes/projects/${slug}`);
+		redirect(303, `/admin/projects/${slug}`);
 	}
 };

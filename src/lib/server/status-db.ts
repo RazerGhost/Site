@@ -6,7 +6,7 @@ import { env } from '$env/dynamic/private';
 export type Status = { updated: string; items: string[] };
 
 // Single-row table, same "just enough SQLite" shape as simkl-cache.ts's
-// snapshot row — lets /status be edited from /notes/status and persist
+// snapshot row — lets /status be edited from /admin/status and persist
 // across redeploys via the same data/ volume as notes.db, instead of
 // requiring a code change + redeploy to post an update.
 const SCHEMA = `

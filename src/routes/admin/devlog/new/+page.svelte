@@ -1,82 +1,59 @@
 <script lang="ts">
 	import { marked } from 'marked';
+	import { untrack } from 'svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import type { PageProps } from './$types';
 
-	let { data, form }: PageProps = $props();
+	let { form }: PageProps = $props();
 
-	let body = $state(form?.body ?? data.body);
+	const today = new Date().toISOString().slice(0, 10);
+
+	let body = $state(untrack(() => form?.body ?? ''));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
 </script>
 
-<Seo title="Edit {data.name} — RazerGhost" description="Private projects editor." path="/notes/projects/{data.slug}" noindex />
+<Seo title="New devlog post — RazerGhost" description="Private devlog editor." path="/admin/devlog/new" noindex />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
-	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit project</h1>
+	<h1 class="text-3xl font-extrabold tracking-tight text-white">New devlog post</h1>
 
-	<form method="POST" action="?/update" class="mt-8 flex flex-col gap-4">
+	<form method="POST" class="mt-8 flex flex-col gap-4">
 		{#if form?.error}
 			<p class="text-sm text-red-400">{form.error}</p>
 		{/if}
 
 		<input
 			type="text"
-			name="name"
-			placeholder="Name"
-			value={form?.name ?? data.name}
+			name="title"
+			placeholder="Title"
+			value={form?.title ?? ''}
 			required
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
-
-		<textarea
-			name="description"
-			placeholder="Short description"
-			rows="2"
-			required
-			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-			>{form?.description ?? data.description}</textarea
-		>
-
-		<div class="flex gap-3">
-			<input
-				type="url"
-				name="href"
-				placeholder="Repo URL (optional)"
-				value={form?.href ?? data.href}
-				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-			/>
-			<input
-				type="url"
-				name="live"
-				placeholder="Live URL (optional)"
-				value={form?.live ?? data.live}
-				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-			/>
-		</div>
 
 		<div class="flex gap-3">
 			<input
 				type="date"
 				name="date"
-				value={form?.date ?? data.date}
+				value={form?.date ?? today}
 				required
 				class="rounded-lg border border-border bg-transparent px-4 py-2 text-white focus:border-primary focus:outline-none"
 			/>
 			<input
 				type="text"
-				name="tags"
-				placeholder="Tags (comma separated)"
-				value={form?.tags ?? data.tags}
+				name="series"
+				placeholder="Series (optional)"
+				value={form?.series ?? ''}
 				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 			/>
 		</div>
 
 		<input
 			type="text"
-			name="stack"
-			placeholder="Tech stack (comma separated, optional)"
-			value={form?.stack ?? data.stack}
+			name="tags"
+			placeholder="Tags (comma separated)"
+			value={form?.tags ?? ''}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
@@ -84,36 +61,20 @@
 			type="text"
 			name="cover"
 			placeholder="Cover image path (optional)"
-			value={form?.cover ?? data.cover}
+			value={form?.cover ?? ''}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
-		<input
-			type="text"
-			name="images"
-			placeholder="Gallery image paths (comma separated, optional)"
-			value={form?.images ?? data.images}
+		<textarea
+			name="excerpt"
+			placeholder="Excerpt"
+			rows="2"
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-		/>
-
-		<div class="flex items-center gap-4">
-			<select
-				name="status"
-				value={form?.status ?? data.status}
-				class="rounded-lg border border-border bg-transparent px-4 py-2 text-white focus:border-primary focus:outline-none"
-			>
-				<option value="active">Active</option>
-				<option value="paused">Paused</option>
-				<option value="archived">Archived</option>
-			</select>
-			<label class="flex items-center gap-2 text-sm text-gray">
-				<input type="checkbox" name="featured" checked={form?.featured ?? data.featured} />
-				Featured
-			</label>
-		</div>
+			>{form?.excerpt ?? ''}</textarea
+		>
 
 		<label class="flex items-center gap-2 text-sm text-gray">
-			<input type="checkbox" name="draft" checked={form?.draft ?? data.draft} class="accent-primary" />
+			<input type="checkbox" name="draft" checked={form?.draft ?? true} class="accent-primary" />
 			Draft (hidden from public list, RSS, sitemap — viewable via direct link)
 		</label>
 
@@ -141,6 +102,8 @@
 		<textarea
 			name="body"
 			bind:value={body}
+			placeholder="Write something..."
+			required
 			rows="16"
 			hidden={mode === 'preview'}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
@@ -159,29 +122,11 @@
 				Save
 			</button>
 			<a
-				href="/projects/{data.slug}"
-				target="_blank"
-				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
-			>
-				View live
-			</a>
-			<a
-				href="/notes/projects"
+				href="/admin/devlog"
 				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 			>
 				Cancel
 			</a>
 		</div>
-	</form>
-
-	<form
-		method="POST"
-		action="?/delete"
-		class="mt-8"
-		onsubmit={(e) => {
-			if (!confirm(`Delete "${data.name}"?`)) e.preventDefault();
-		}}
-	>
-		<button type="submit" class="link text-xs text-dim hover:text-red-400">Delete this project</button>
 	</form>
 </main>

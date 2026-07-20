@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { marked } from 'marked';
+	import { untrack } from 'svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
 	const title = $derived(form?.title ?? data.note.title);
-	let body = $state(form?.body ?? data.note.body);
+	let body = $state(untrack(() => form?.body ?? data.note.body));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
 </script>

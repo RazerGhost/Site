@@ -1,23 +1,22 @@
 <script lang="ts">
 	import { marked } from 'marked';
+	import { untrack } from 'svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import type { PageProps } from './$types';
 
-	let { form }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 
-	const today = new Date().toISOString().slice(0, 10);
-
-	let body = $state(form?.body ?? '');
+	let body = $state(untrack(() => form?.body ?? data.body));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
 </script>
 
-<Seo title="New project — RazerGhost" description="Private projects editor." path="/notes/projects/new" noindex />
+<Seo title="Edit {data.name} — RazerGhost" description="Private projects editor." path="/admin/projects/{data.slug}" noindex />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
-	<h1 class="text-3xl font-extrabold tracking-tight text-white">New project</h1>
+	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit project</h1>
 
-	<form method="POST" class="mt-8 flex flex-col gap-4">
+	<form method="POST" action="?/update" class="mt-8 flex flex-col gap-4">
 		{#if form?.error}
 			<p class="text-sm text-red-400">{form.error}</p>
 		{/if}
@@ -26,7 +25,7 @@
 			type="text"
 			name="name"
 			placeholder="Name"
-			value={form?.name ?? ''}
+			value={form?.name ?? data.name}
 			required
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
@@ -37,7 +36,7 @@
 			rows="2"
 			required
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
-			>{form?.description ?? ''}</textarea
+			>{form?.description ?? data.description}</textarea
 		>
 
 		<div class="flex gap-3">
@@ -45,14 +44,14 @@
 				type="url"
 				name="href"
 				placeholder="Repo URL (optional)"
-				value={form?.href ?? ''}
+				value={form?.href ?? data.href}
 				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 			/>
 			<input
 				type="url"
 				name="live"
 				placeholder="Live URL (optional)"
-				value={form?.live ?? ''}
+				value={form?.live ?? data.live}
 				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 			/>
 		</div>
@@ -61,7 +60,7 @@
 			<input
 				type="date"
 				name="date"
-				value={form?.date ?? today}
+				value={form?.date ?? data.date}
 				required
 				class="rounded-lg border border-border bg-transparent px-4 py-2 text-white focus:border-primary focus:outline-none"
 			/>
@@ -69,7 +68,7 @@
 				type="text"
 				name="tags"
 				placeholder="Tags (comma separated)"
-				value={form?.tags ?? ''}
+				value={form?.tags ?? data.tags}
 				class="flex-1 rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 			/>
 		</div>
@@ -78,7 +77,7 @@
 			type="text"
 			name="stack"
 			placeholder="Tech stack (comma separated, optional)"
-			value={form?.stack ?? ''}
+			value={form?.stack ?? data.stack}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
@@ -86,7 +85,7 @@
 			type="text"
 			name="cover"
 			placeholder="Cover image path (optional)"
-			value={form?.cover ?? ''}
+			value={form?.cover ?? data.cover}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
@@ -94,14 +93,14 @@
 			type="text"
 			name="images"
 			placeholder="Gallery image paths (comma separated, optional)"
-			value={form?.images ?? ''}
+			value={form?.images ?? data.images}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
 		/>
 
 		<div class="flex items-center gap-4">
 			<select
 				name="status"
-				value={form?.status ?? 'active'}
+				value={form?.status ?? data.status}
 				class="rounded-lg border border-border bg-transparent px-4 py-2 text-white focus:border-primary focus:outline-none"
 			>
 				<option value="active">Active</option>
@@ -109,13 +108,13 @@
 				<option value="archived">Archived</option>
 			</select>
 			<label class="flex items-center gap-2 text-sm text-gray">
-				<input type="checkbox" name="featured" checked={form?.featured ?? false} />
+				<input type="checkbox" name="featured" checked={form?.featured ?? data.featured} />
 				Featured
 			</label>
 		</div>
 
 		<label class="flex items-center gap-2 text-sm text-gray">
-			<input type="checkbox" name="draft" checked={form?.draft ?? false} class="accent-primary" />
+			<input type="checkbox" name="draft" checked={form?.draft ?? data.draft} class="accent-primary" />
 			Draft (hidden from public list, RSS, sitemap — viewable via direct link)
 		</label>
 
@@ -143,7 +142,6 @@
 		<textarea
 			name="body"
 			bind:value={body}
-			placeholder="Write something..."
 			rows="16"
 			hidden={mode === 'preview'}
 			class="rounded-lg border border-border bg-transparent px-4 py-2 text-white placeholder:text-dim focus:border-primary focus:outline-none"
@@ -162,11 +160,29 @@
 				Save
 			</button>
 			<a
-				href="/notes/projects"
+				href="/projects/{data.slug}"
+				target="_blank"
+				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
+			>
+				View live
+			</a>
+			<a
+				href="/admin/projects"
 				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 			>
 				Cancel
 			</a>
 		</div>
+	</form>
+
+	<form
+		method="POST"
+		action="?/delete"
+		class="mt-8"
+		onsubmit={(e) => {
+			if (!confirm(`Delete "${data.name}"?`)) e.preventDefault();
+		}}
+	>
+		<button type="submit" class="link text-xs text-dim hover:text-red-400">Delete this project</button>
 	</form>
 </main>

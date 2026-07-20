@@ -5,13 +5,13 @@
 	let { data }: PageProps = $props();
 </script>
 
-<Seo title="Devlog editor — RazerGhost" description="Private devlog editor." path="/notes/devlog" noindex />
+<Seo title="Devlog editor — RazerGhost" description="Private devlog editor." path="/admin/devlog" noindex />
 
 <main class="mx-auto max-w-3xl px-6 py-16">
 	<div class="flex items-center justify-between">
 		<h1 class="text-3xl font-extrabold tracking-tight text-white">Devlog posts</h1>
 		<a
-			href="/notes/devlog/new"
+			href="/admin/devlog/new"
 			class="link rounded-full border border-primary px-4 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
 		>
 			New post
@@ -26,7 +26,7 @@
 		{#each data.entries as entry (entry.slug)}
 			<li class="flex items-center justify-between gap-4 py-3">
 				<div class="min-w-0">
-					<a href="/notes/devlog/{entry.slug}" class="link truncate font-medium text-white hover:text-primary">
+					<a href="/admin/devlog/{entry.slug}" class="link truncate font-medium text-white hover:text-primary">
 						{entry.title}
 					</a>
 					<div class="mt-0.5 flex items-center gap-2 text-xs text-dim">

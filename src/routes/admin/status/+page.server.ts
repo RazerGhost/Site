@@ -21,6 +21,6 @@ export const actions: Actions = {
 		}
 
 		setStatus(updated, items);
-		redirect(303, '/notes/status');
+		redirect(303, '/admin/status');
 	}
 };

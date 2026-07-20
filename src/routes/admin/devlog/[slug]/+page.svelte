@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { marked } from 'marked';
+	import { untrack } from 'svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
-	let body = $state(form?.body ?? data.body);
+	let body = $state(untrack(() => form?.body ?? data.body));
 	let mode = $state<'write' | 'preview'>('write');
 	const previewHtml = $derived(marked.parse(body, { async: false }) as string);
 </script>
 
-<Seo title="Edit {data.title} — RazerGhost" description="Private devlog editor." path="/notes/devlog/{data.slug}" noindex />
+<Seo title="Edit {data.title} — RazerGhost" description="Private devlog editor." path="/admin/devlog/{data.slug}" noindex />
 
 <main class="mx-auto max-w-2xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Edit post</h1>
@@ -125,7 +126,7 @@
 				View live
 			</a>
 			<a
-				href="/notes/devlog"
+				href="/admin/devlog"
 				class="link rounded-full border border-border px-4 py-2 text-sm text-gray transition-colors hover:border-primary hover:text-primary"
 			>
 				Cancel

@@ -1,15 +1,19 @@
 <script lang="ts">
 	import Seo from '$lib/components/Seo.svelte';
+	import { enhance } from '$app/forms';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
+
+	let bulkRefreshing = $state(false);
+	const missingCount = $derived(data.entries.filter((entry) => entry.runtime == null).length);
 
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 	}
 </script>
 
-<Seo title="Watchlist cache — RazerGhost" description="Private Simkl cache inspector." path="/notes/watchlist-cache" noindex />
+<Seo title="Watchlist cache — RazerGhost" description="Private Simkl cache inspector." path="/admin/watchlist-cache" noindex />
 
 <main class="mx-auto max-w-4xl px-6 py-16">
 	<h1 class="text-3xl font-extrabold tracking-tight text-white">Watchlist cache</h1>
@@ -20,7 +24,40 @@
 		{/if}
 	</p>
 
-	<div class="mt-8 overflow-x-auto rounded-lg border border-border">
+	<div class="mt-6 flex flex-wrap items-center gap-3">
+		<form
+			method="POST"
+			action="?/refreshMissing"
+			use:enhance={() => {
+				bulkRefreshing = true;
+				return async ({ update }) => {
+					await update();
+					bulkRefreshing = false;
+				};
+			}}
+		>
+			<button
+				type="submit"
+				disabled={bulkRefreshing || missingCount === 0 || !data.configured}
+				class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-white transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				{bulkRefreshing ? 'Refreshing…' : `Refresh all missing runtimes (${missingCount})`}
+			</button>
+		</form>
+		{#if form?.bulk}
+			<p class="text-xs text-dim">
+				{form.filled} of {form.total} now have a runtime.
+				{#if form.stillMissing}
+					{form.stillMissing} still have none — Simkl itself has no runtime data for {form.stillMissing === 1 ? 'that title' : 'those titles'}.
+				{/if}
+				{#if form.failed}
+					{form.failed} fetch{form.failed === 1 ? '' : 'es'} failed.
+				{/if}
+			</p>
+		{/if}
+	</div>
+
+	<div class="mt-6 overflow-x-auto rounded-lg border border-border">
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-border text-xs text-dim">
 				<tr>

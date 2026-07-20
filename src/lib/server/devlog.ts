@@ -64,7 +64,7 @@ function toMeta(slug: string, meta: Record<string, unknown>, body: string): Devl
 // for previewing a post before it goes live.
 // Parsed results are cached per server process and invalidated by file
 // mtimes (see contentDirSignature) — editing a post on disk (by hand or via
-// /notes/devlog) still takes effect on the next request, but unchanged
+// /admin/devlog) still takes effect on the next request, but unchanged
 // content no longer costs a full re-read + re-parse of every file per
 // request. Callers must not mutate the returned arrays/objects.
 let listCache: { signature: string; entries: DevlogMeta[] } | null = null;

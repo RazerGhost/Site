@@ -1,31 +1,13 @@
 import path from 'node:path';
-import { error, fail, redirect } from '@sveltejs/kit';
-import { getRawEntry, writeEntry, renameEntry, deleteEntry } from '$lib/server/content-editor';
+import { fail, redirect } from '@sveltejs/kit';
+import { writeEntry } from '$lib/server/content-editor';
 import { slugifyHeading } from '$lib/server/content';
-import { toDateString } from '$lib/server/content';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 
 const CONTENT_DIR = path.resolve(process.cwd(), 'src/content/devlog');
 
-export const load: PageServerLoad = ({ params }) => {
-	const entry = getRawEntry(CONTENT_DIR, params.slug);
-	if (!entry) error(404, 'Post not found');
-
-	return {
-		slug: entry.slug,
-		title: String(entry.meta.title ?? entry.slug),
-		date: toDateString(entry.meta.date),
-		tags: Array.isArray(entry.meta.tags) ? (entry.meta.tags as string[]).join(', ') : '',
-		cover: entry.meta.cover ? String(entry.meta.cover) : '',
-		excerpt: entry.meta.excerpt ? String(entry.meta.excerpt) : '',
-		series: entry.meta.series ? String(entry.meta.series) : '',
-		draft: entry.meta.draft === true,
-		body: entry.body
-	};
-};
-
 export const actions: Actions = {
-	update: async ({ request, params }) => {
+	default: async ({ request }) => {
 		const data = await request.formData();
 		const title = String(data.get('title') ?? '').trim();
 		const date = String(data.get('date') ?? '').trim();
@@ -45,18 +27,11 @@ export const actions: Actions = {
 			return fail(400, { title, date, tags, cover, excerpt, series, draft, body, error: 'Date must be YYYY-MM-DD.' });
 		}
 
-		const newSlug = `${date}-${slugifyHeading(title)}`;
-		if (newSlug !== params.slug) {
-			try {
-				renameEntry(CONTENT_DIR, params.slug, newSlug);
-			} catch (e) {
-				return fail(400, { title, date, tags, cover, excerpt, series, draft, body, error: (e as Error).message });
-			}
-		}
+		const slug = `${date}-${slugifyHeading(title)}`;
 
 		writeEntry(
 			CONTENT_DIR,
-			newSlug,
+			slug,
 			{
 				title,
 				date,
@@ -72,11 +47,6 @@ export const actions: Actions = {
 			body
 		);
 
-		redirect(303, `/notes/devlog/${newSlug}`);
-	},
-
-	delete: async ({ params }) => {
-		deleteEntry(CONTENT_DIR, params.slug);
-		redirect(303, '/notes/devlog');
+		redirect(303, `/admin/devlog/${slug}`);
 	}
 };

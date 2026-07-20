@@ -7,6 +7,7 @@
 	import CircleHelp from '@lucide/svelte/icons/circle-help';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import { tooltip } from '$lib/actions/tooltip';
+	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -93,22 +94,24 @@
 	}
 
 	let nodes = $state<SimNode[]>(
-		data.notes.map((n: GraphNote, i: number) => {
-			const fallback = scatterPoint(i);
-			return {
-				id: n.id,
-				title: n.title,
-				x: n.x ?? fallback.x,
-				y: n.y ?? fallback.y,
-				vx: 0,
-				vy: 0,
-				tags: n.tags ?? '',
-				folder: n.folder ?? '',
-				updated_at: n.updated_at
-			};
-		})
+		untrack(() =>
+			data.notes.map((n: GraphNote, i: number) => {
+				const fallback = scatterPoint(i);
+				return {
+					id: n.id,
+					title: n.title,
+					x: n.x ?? fallback.x,
+					y: n.y ?? fallback.y,
+					vx: 0,
+					vy: 0,
+					tags: n.tags ?? '',
+					folder: n.folder ?? '',
+					updated_at: n.updated_at
+				};
+			})
+		)
 	);
-	let links = $state<GraphLink[]>(data.links.map((l: GraphLink) => ({ ...l })));
+	let links = $state<GraphLink[]>(untrack(() => data.links.map((l: GraphLink) => ({ ...l }))));
 
 	const nodeById = $derived(new Map(nodes.map((n) => [n.id, n])));
 	const connectionCount = $derived.by(() => {
@@ -1793,6 +1796,8 @@
 								{#if panelTags}<span>{panelTags}</span>{/if}
 							</div>
 						{/if}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<div
 							role="group"
 							aria-label="Note"
@@ -1927,6 +1932,8 @@
 							class="flex-1 resize-none rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-white placeholder:text-dim focus:border-primary focus:outline-none"
 						></textarea>
 					{:else if panelMode === 'preview'}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<div
 							role="group"
 							aria-label="Note preview"

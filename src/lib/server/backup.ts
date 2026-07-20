@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 // text diffs cleanly and compresses well across snapshots, unlike committing
 // the raw binary .db file where a single row change can shuffle bytes across
 // the whole file. Returns null if the file doesn't exist yet (e.g. a DB that
-// hasn't been touched, like status.db before /notes/status is first used).
+// hasn't been touched, like status.db before /admin/status is first used).
 export function dumpDatabaseToSql(dbPath: string): string | null {
 	if (!fs.existsSync(dbPath)) return null;
 

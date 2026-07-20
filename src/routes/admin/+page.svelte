@@ -17,19 +17,19 @@
 		},
 		{
 			label: 'Devlog editor',
-			href: '/notes/devlog',
+			href: '/admin/devlog',
 			icon: FileText,
 			description: 'Write and edit posts in src/content/devlog. Commit + push to publish.'
 		},
 		{
 			label: 'Projects editor',
-			href: '/notes/projects',
+			href: '/admin/projects',
 			icon: FolderKanban,
 			description: 'Write and edit entries in src/content/projects. Commit + push to publish.'
 		},
 		{
 			label: 'Status editor',
-			href: '/notes/status',
+			href: '/admin/status',
 			icon: Activity,
 			description: 'Edit the "Right now" card shown on the homepage.'
 		},
@@ -41,7 +41,7 @@
 		},
 		{
 			label: 'Watchlist cache',
-			href: '/notes/watchlist-cache',
+			href: '/admin/watchlist-cache',
 			icon: Database,
 			description: 'Inspect and force-refresh cached Simkl genre/synopsis/runtime rows.'
 		}
