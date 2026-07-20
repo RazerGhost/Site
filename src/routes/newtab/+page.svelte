@@ -162,16 +162,16 @@
 
 	<form class="mx-auto mt-8 w-full max-w-lg" onsubmit={submitSearch}>
 		<label class="relative block">
-			<Search
-				size={16}
-				aria-hidden="true"
-				class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-white/50"
-			/>
 			<input
 				type="search"
 				bind:value={query}
 				placeholder="Search the web…"
 				class="glass w-full rounded-full py-3 pr-4 pl-10 text-sm text-white placeholder-white/40 outline-none focus:border-primary/60"
+			/>
+			<Search
+				size={16}
+				aria-hidden="true"
+				class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-white/50"
 			/>
 		</label>
 	</form>
