@@ -56,3 +56,42 @@ export async function getSpotifyAccessToken(): Promise<string> {
 	}
 	return refreshInFlight;
 }
+
+export interface CurrentlyPlaying {
+	playing: boolean;
+	track?: string;
+	artist?: string;
+	url?: string;
+	albumArt?: string;
+	progressMs?: number;
+	durationMs?: number;
+}
+
+// Shared by the /api/spotify polling route (floating widget) and the
+// homepage server load — one fetch/parse implementation for both.
+export async function getCurrentlyPlaying(): Promise<CurrentlyPlaying> {
+	const accessToken = await getSpotifyAccessToken();
+	const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+		headers: { Authorization: `Bearer ${accessToken}` },
+		signal: AbortSignal.timeout(10_000)
+	});
+
+	if (res.status === 204 || !res.ok) {
+		return { playing: false };
+	}
+
+	const data = await res.json();
+	if (!data?.item) {
+		return { playing: false };
+	}
+
+	return {
+		playing: Boolean(data.is_playing),
+		track: data.item.name,
+		artist: data.item.artists?.map((a: { name: string }) => a.name).join(', '),
+		url: data.item.external_urls?.spotify,
+		albumArt: data.item.album?.images?.[2]?.url ?? data.item.album?.images?.[0]?.url,
+		progressMs: data.progress_ms ?? 0,
+		durationMs: data.item.duration_ms ?? 0
+	};
+}

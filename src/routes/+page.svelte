@@ -2,6 +2,7 @@
 	import DiscordPresence from '$lib/components/DiscordPresence.svelte';
 	import GithubActivity from '$lib/components/GithubActivity.svelte';
 	import Logo from '$lib/components/Logo.svelte';
+	import ProjectCard from '$lib/components/ProjectCard.svelte';
 	import GithubIcon from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import LinkedinIcon from '$lib/components/icons/LinkedinIcon.svelte';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -80,6 +81,35 @@
 
 		<div class="flex flex-col gap-4">
 			<section class="card flex flex-1 flex-col rounded-lg border border-border bg-surface p-6" use:reveal>
+				<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
+					<Music size={13} aria-hidden="true" /> Now playing
+				</h2>
+
+				{#if data.nowPlaying}
+					<a
+						href={data.nowPlaying.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="link mt-4 flex items-center gap-3"
+					>
+						{#if data.nowPlaying.albumArt}
+							<img
+								src={data.nowPlaying.albumArt}
+								alt=""
+								class="h-14 w-14 shrink-0 rounded-md object-cover"
+							/>
+						{/if}
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium text-white">{data.nowPlaying.track}</p>
+							<p class="truncate text-sm text-dim">{data.nowPlaying.artist}</p>
+						</div>
+					</a>
+				{:else}
+					<p class="mt-4 text-sm text-dim">Nothing playing right now.</p>
+				{/if}
+			</section>
+
+			<section class="card flex flex-1 flex-col rounded-lg border border-border bg-surface p-6" use:reveal>
 				<div class="flex items-baseline justify-between">
 					<h2 class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-dim">
 						<Music size={13} aria-hidden="true" /> Listens
@@ -87,7 +117,14 @@
 					<a href="/listens" class="link text-xs text-primary hover:opacity-85">See all</a>
 				</div>
 
-				{#if data.topTrack}
+				{#if data.currentStreak}
+					<p class="mt-4 text-2xl font-bold text-white">
+						{data.currentStreak} day{data.currentStreak === 1 ? '' : 's'}
+					</p>
+					<p class="mt-1 text-xs text-dim">
+						current streak · {data.totalPlays.toLocaleString()} plays logged
+					</p>
+				{:else if data.topTrack}
 					<p class="mt-4 truncate text-sm font-medium text-white">{data.topTrack.track}</p>
 					<p class="truncate text-sm text-dim">{data.topTrack.artist}</p>
 					<p class="mt-3 text-xs text-dim">
@@ -159,6 +196,29 @@
 				{/each}
 			</ul>
 		</section>
+
+		{#if data.projects.length}
+			<section
+				class="card rounded-lg border border-border bg-surface p-6 sm:col-span-2 lg:col-span-3"
+				use:reveal
+			>
+				<div class="flex items-baseline justify-between">
+					<h2 class="text-xl font-bold text-white">Projects</h2>
+					<a
+						href="/projects"
+						class="link flex items-center gap-1 text-sm text-primary hover:opacity-85"
+					>
+						View all <ArrowRight size={15} aria-hidden="true" />
+					</a>
+				</div>
+
+				<div class="mt-6 grid gap-4 sm:grid-cols-3">
+					{#each data.projects as project}
+						<ProjectCard {project} />
+					{/each}
+				</div>
+			</section>
+		{/if}
 	</div>
 
 	<section class="cta-band mt-20" use:reveal>
