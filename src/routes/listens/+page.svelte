@@ -699,7 +699,10 @@
         </div>
 
         {#if data.topAlbums.length || data.discoveries.length}
-            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div
+                class="mt-4 grid grid-cols-1 gap-4"
+                class:md:grid-cols-2={data.topAlbums.length && data.discoveries.length}
+            >
                 {#if data.topAlbums.length}
                     <div
                         class="rounded-lg border border-border p-5 sm:p-6"
