@@ -516,14 +516,14 @@
 	}
 
 	function widgetClass(id: WidgetId): string {
-		const base = 'rounded-xl border p-3 transition-all';
+		const base = 'rounded-xl border border-transparent p-3 transition-all';
 		if (floatPositions[id]) {
 			const lifted = activeDragId === id ? ' scale-105 opacity-90' : '';
 			return `glass floating-widget rounded-2xl p-4${lifted}`;
 		}
 		const span = fullWidthIds.has(id) ? ' sm:col-span-3' : '';
 		if (dragOverId === id) return `${base} border-primary bg-primary/10 ring-2 ring-primary/50${span}`;
-		return `${base} border-white/10${span}`;
+		return `${base}${span}`;
 	}
 
 	function widgetStyle(id: WidgetId): string {
