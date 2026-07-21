@@ -27,4 +27,4 @@ GitHub OAuth Apps require an exact callback URL match, so you need a **second OA
 ## Gaps to be aware of
 
 - No CSRF token on state beyond the `oauth_state` cookie round-trip; acceptable for a single-owner login but worth knowing if this ever needs to support more than one user.
-- No rate limiting on `/auth/callback` or `/auth/login`.
+- `/auth/login` and `/auth/callback` are rate limited to 10 requests/minute/IP (in-memory, per-process — see `checkRateLimit` in [src/hooks.server.ts](../src/hooks.server.ts)).

@@ -1,6 +1,7 @@
 import { error, redirect, type Handle } from '@sveltejs/kit';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '$lib/server/session';
 import { startSimklRefreshLoop } from '$lib/server/simkl-refresh';
+import { checkRateLimit } from '$lib/server/rate-limit';
 
 startSimklRefreshLoop();
 
@@ -14,7 +15,29 @@ function isProtectedPath(pathname: string): boolean {
 	return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+// Auth endpoints get a generous limit since legitimate OAuth redirects can
+// bounce through here more than once; secret-gated endpoints are meant to be
+// hit by a scheduled job every 15-30 min, so a tight limit doesn't interfere.
+const RATE_LIMITED_ROUTES: { prefix: string; limit: number; windowSeconds: number }[] = [
+	{ prefix: '/auth/login', limit: 10, windowSeconds: 60 },
+	{ prefix: '/auth/callback', limit: 10, windowSeconds: 60 },
+	{ prefix: '/api/backup', limit: 5, windowSeconds: 60 },
+	{ prefix: '/api/spotify/scrobble', limit: 5, windowSeconds: 60 }
+];
+
 export const handle: Handle = ({ event, resolve }) => {
+	const rateLimited = RATE_LIMITED_ROUTES.find((r) => event.url.pathname === r.prefix || event.url.pathname.startsWith(`${r.prefix}/`));
+	if (rateLimited) {
+		const key = `${rateLimited.prefix}:${event.getClientAddress()}`;
+		const result = checkRateLimit(key, rateLimited.limit, rateLimited.windowSeconds);
+		if (result.limited) {
+			return new Response('Too many requests', {
+				status: 429,
+				headers: { 'Retry-After': String(result.retryAfterSeconds) }
+			});
+		}
+	}
+
 	const session = verifySessionToken(event.cookies.get(SESSION_COOKIE_NAME));
 	if (session) {
 		event.locals.user = { username: session.sub };

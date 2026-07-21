@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { getSpotifyAccessToken, spotifyConfigured } from '$lib/server/spotify';
@@ -27,7 +28,9 @@ export const GET: RequestHandler = async ({ url, request }) => {
 	const provided =
 		request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
 		url.searchParams.get('secret');
-	if (provided !== secret) error(401, 'Unauthorized');
+	const a = Buffer.from(provided ?? '');
+	const b = Buffer.from(secret);
+	if (a.length !== b.length || !timingSafeEqual(a, b)) error(401, 'Unauthorized');
 
 	if (!spotifyConfigured()) error(503, 'Spotify not configured');
 
