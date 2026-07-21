@@ -1,6 +1,6 @@
 # ghostbase
 
-Personal link hub + devlog for [razerghost.xyz](https://razerghost.xyz), built with SvelteKit (Svelte 5), Tailwind CSS 4, and mdsvex. Deployed via Docker (adapter-node) behind Coolify/Traefik.
+Personal link hub + devlog for [razerghost.xyz](https://razerghost.xyz), built with SvelteKit (Svelte 5), Tailwind CSS 4, and mdsvex. Deployed via Docker (adapter-node) behind Coolify/Traefik. Built with [Claude Code](https://claude.com/claude-code) — the devlog covers a bunch of what that looked like in practice.
 
 > Looking for guidance aimed at Claude Code / an AI assistant working in this repo? See [CLAUDE.md](CLAUDE.md). This README is the human-facing version — more setup detail, less "how to modify this codebase."
 >

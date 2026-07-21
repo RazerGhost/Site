@@ -2,7 +2,7 @@ export const site = {
   name: "RazerGhost",
   tagline: "working on the most random things",
   url: "https://razerghost.xyz",
-  description: "Personal link hub and devlog.",
+  description: "Personal site — link hub, devlog, watchlist, and listening history.",
   githubUsername: "RazerGhost",
   // Numeric GitHub user ID (immutable, unlike the username) — this is what
   // auth actually checks against, so a future username change/reclaim can't
