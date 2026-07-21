@@ -75,10 +75,13 @@
 			</ul>
 		</section>
 
-		<section class="card rounded-lg border border-border bg-surface p-6 lg:col-span-2" use:reveal>
+		<section
+			class="card self-start rounded-lg border border-border bg-surface p-6 lg:col-span-2"
+			use:reveal
+		>
 			<h2 class="text-xl font-bold text-white">Right now</h2>
 
-			<div class="mt-6 grid gap-6 sm:grid-cols-2">
+			<div class="mt-6 grid items-start gap-6 sm:grid-cols-2">
 				<div>
 					<h3 class="text-xs font-medium uppercase tracking-wide text-dim">Currently</h3>
 					<ul class="mt-3 grid gap-2">
@@ -90,7 +93,7 @@
 				<div class="sm:border-l sm:border-border sm:pl-6">
 					<h3 class="text-xs font-medium uppercase tracking-wide text-dim">GitHub</h3>
 					<div class="mt-3">
-						<GithubActivity limit={3} />
+						<GithubActivity limit={8} />
 					</div>
 				</div>
 			</div>
