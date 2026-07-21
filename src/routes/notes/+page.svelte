@@ -12,6 +12,20 @@
 
 	let { data }: PageProps = $props();
 
+	// ── Mobile: the force-graph canvas relies on hover/drag/keyboard
+	// interactions that don't translate to touch, so small screens get a
+	// plain list + full-screen editor instead (see the {#if isMobile} branch
+	// near the bottom of the markup). Both branches share the same state.
+	let isMobile = $state(false);
+	$effect(() => {
+		if (!browser) return;
+		const mq = window.matchMedia('(max-width: 768px)');
+		isMobile = mq.matches;
+		const onChange = (e: MediaQueryListEvent) => (isMobile = e.matches);
+		mq.addEventListener('change', onChange);
+		return () => mq.removeEventListener('change', onChange);
+	});
+
 	type GraphNote = {
 		id: number;
 		title: string;
@@ -483,6 +497,14 @@
 		selectedId = null;
 		panelDirty = false;
 		panelView = 'view';
+	}
+
+	// Mobile editor's "Back" button: flush any pending edit before leaving,
+	// same reasoning as selectNote's flush (avoid a lost debounced save).
+	async function mobileBack() {
+		clearTimeout(autosaveTimer);
+		if (panelDirty) await savePanel();
+		closePanel();
 	}
 
 	// Saves the panel's current content to `id` — callers must only pass an
@@ -1049,6 +1071,7 @@
 	}
 
 	$effect(() => {
+		if (isMobile) return;
 		centerView();
 		wake();
 	});
@@ -1238,7 +1261,133 @@
 
 <Seo title="Notes — RazerGhost" description="Private notes." path="/notes" noindex />
 
-<main class="flex h-screen w-full overflow-hidden">
+<main class="{isMobile ? 'flex' : 'hidden'} h-[100dvh] w-full flex-col overflow-hidden bg-bg">
+		{#if selectedId === null}
+			<!-- List view -->
+			<header class="flex items-center justify-between border-b border-border px-4 py-3">
+				<a href="/" class="link flex items-center gap-1.5 text-xs text-dim hover:text-primary">
+					<Logo variant="outline" size={16} />
+					RazerGhost
+				</a>
+				<ThemeToggle />
+			</header>
+			<div class="border-b border-border p-3">
+				<input
+					type="text"
+					bind:value={search}
+					placeholder="Search notes…"
+					class="input w-full rounded-md border border-border bg-transparent px-3 py-2 text-base text-white placeholder:text-dim"
+				/>
+			</div>
+			<ul class="flex-1 overflow-y-auto">
+				{#each searchedList as note (note.id)}
+					<li class="border-b border-border">
+						<button
+							type="button"
+							onclick={() => selectNote(note.id)}
+							class="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left active:bg-surface-2"
+						>
+							<span class="truncate text-base font-medium text-white">{note.title || 'Untitled'}</span>
+							<span class="text-xs text-dim">{new Date(note.updated_at).toLocaleDateString()}</span>
+						</button>
+					</li>
+				{:else}
+					<li class="px-4 py-10 text-center text-sm text-dim">No notes yet — tap + to write one.</li>
+				{/each}
+			</ul>
+			<button
+				type="button"
+				onclick={() => createNoteAt(0, 0)}
+				aria-label="New note"
+				class="fixed bottom-6 right-6 grid h-14 w-14 place-items-center rounded-full border border-primary bg-surface text-3xl leading-none text-primary shadow-lg active:bg-primary/10"
+			>
+				+
+			</button>
+		{:else}
+			<!-- Full-screen editor -->
+			<header class="flex items-center justify-between border-b border-border px-3 py-2">
+				<button type="button" onclick={mobileBack} class="text-sm text-dim hover:text-white">
+					← Back
+				</button>
+				<span class="text-[11px] text-dim">
+					{#if panelSaving}Saving…{:else if !panelDirty}Saved{/if}
+				</span>
+				<button type="button" onclick={deleteSelected} class="text-xs text-dim hover:text-red-400">
+					Delete
+				</button>
+			</header>
+			{#if loadingNote}
+				<p class="p-4 text-sm text-dim">Loading…</p>
+			{:else if panelError}
+				<p class="p-4 text-sm text-red-400">{panelError}</p>
+			{:else}
+				<input
+					type="text"
+					bind:value={panelTitle}
+					oninput={() => (panelDirty = true)}
+					placeholder="Title"
+					class="border-b border-border bg-transparent px-4 py-3 text-lg font-semibold text-white placeholder:text-dim focus:outline-none"
+				/>
+				<input
+					type="text"
+					bind:value={panelTags}
+					oninput={() => (panelDirty = true)}
+					placeholder="Tags, comma-separated"
+					class="border-b border-border bg-transparent px-4 py-2 text-sm text-white placeholder:text-dim focus:outline-none"
+				/>
+				<div class="flex items-center justify-between border-b border-border px-3 py-1.5">
+					<div class="flex gap-1 text-xs">
+						<button
+							type="button"
+							onclick={() => (panelMode = 'write')}
+							class="rounded-full px-3 py-1 transition-colors {panelMode === 'write'
+								? 'bg-primary/10 text-primary'
+								: 'text-dim hover:text-white'}"
+						>
+							Write
+						</button>
+						<button
+							type="button"
+							onclick={() => (panelMode = 'preview')}
+							class="rounded-full px-3 py-1 transition-colors {panelMode === 'preview'
+								? 'bg-primary/10 text-primary'
+								: 'text-dim hover:text-white'}"
+						>
+							Preview
+						</button>
+					</div>
+					<label
+						class="link cursor-pointer rounded-full border border-border px-3 py-1 text-xs text-dim hover:border-primary hover:text-primary"
+					>
+						Add image
+						<input type="file" accept="image/*" class="hidden" onchange={onFileInputChange} />
+					</label>
+				</div>
+				{#if panelMode === 'preview'}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					<div
+						role="group"
+						aria-label="Note preview"
+						onclick={onPreviewClick}
+						class="devlog-content flex-1 overflow-y-auto px-4 py-3"
+					>
+						{@html previewHtml}
+					</div>
+				{:else}
+					<textarea
+						bind:this={bodyTextareaEl}
+						bind:value={panelBody}
+						oninput={() => (panelDirty = true)}
+						onpaste={onBodyPaste}
+						placeholder="Write something… (type [[Note Title]] to link)"
+						class="flex-1 resize-none bg-transparent px-4 py-3 text-base text-white placeholder:text-dim focus:outline-none"
+					></textarea>
+				{/if}
+			{/if}
+		{/if}
+	</main>
+<main class="{isMobile ? 'hidden' : 'flex'} h-screen w-full overflow-hidden">
 	<!-- Sidebar -->
 	<aside class="flex w-60 shrink-0 flex-col border-r border-border bg-surface/40">
 		<div class="flex items-center justify-between border-b border-border px-3 py-2">

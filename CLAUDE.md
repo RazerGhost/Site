@@ -47,6 +47,10 @@ Package manager is pnpm (`packageManager: pnpm@11.3.0`).
 
 **Backups**: [src/routes/api/backup/+server.ts](src/routes/api/backup/+server.ts), secret-gated via `BACKUP_SECRET` (same pattern as the scrobble endpoint above), dumps all four `data/` SQLite DBs to plain-text SQL ([backup.ts](src/lib/server/backup.ts) — schema + `INSERT` statements, not the raw binary file, so it diffs cleanly in git) plus `note-attachments/`, and commits + pushes them to a private git repo (`BACKUP_GIT_REMOTE`, an HTTPS URL with an embedded PAT). Intended to be hit on a schedule the same way the scrobble endpoint is. Requires `git` in the runtime image (see [Dockerfile](Dockerfile)).
 
+## Testing gated pages locally
+
+`/notes`, `/admin`, `/spotify-import`, `/api/notes`, and `/newtab` are all auth-gated in [src/hooks.server.ts](src/hooks.server.ts) (`PROTECTED_PREFIXES`), which redirects/401s anyone without a valid session cookie — including a local dev browser session that isn't logged in via GitHub OAuth. When verifying a change to one of these pages in a browser preview, it's fine to temporarily comment out the relevant prefix (or the whole gate) in `hooks.server.ts` to test without going through the OAuth flow — but **always restore the gate before committing**. Diff `hooks.server.ts` as part of pre-commit review to make sure no gate was left disabled.
+
 ## Icons
 
 Two icon packages are used: `@lucide/svelte` (general icons) and `@icons-pack/svelte-simple-icons` (brand icons). Both ship raw `.svelte` source rather than pre-compiled output, so they're added to `ssr.noExternal` in [vite.config.ts](vite.config.ts) — keep that in mind if adding another icon package that behaves the same way.
