@@ -93,3 +93,18 @@ export function setFullWidthIds(ids: string[]): void {
 export function resetFullWidth(): void {
 	localStorage.removeItem(FULL_WIDTH_KEY);
 }
+
+// Whether the quick links row is displayed sorted by click count instead of
+// the saved manual order — a per-device display preference, same reasoning
+// as everything else in this file.
+const QUICK_LINKS_SORT_KEY = 'newtab:quick-links-sort-by-clicks';
+
+export function getQuickLinksSortByClicks(): boolean {
+	if (typeof localStorage === 'undefined') return false;
+	return localStorage.getItem(QUICK_LINKS_SORT_KEY) === '1';
+}
+
+export function setQuickLinksSortByClicks(sortByClicks: boolean): void {
+	if (sortByClicks) localStorage.setItem(QUICK_LINKS_SORT_KEY, '1');
+	else localStorage.removeItem(QUICK_LINKS_SORT_KEY);
+}

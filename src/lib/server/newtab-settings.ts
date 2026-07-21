@@ -5,7 +5,15 @@ import { env } from '$env/dynamic/private';
 
 export type NewtabSettings = { unsplashQuery: string | null };
 
-export type QuickLink = { id: number; label: string; url: string; position: number; clicks: number };
+export type QuickLink = {
+	id: number;
+	label: string;
+	url: string;
+	position: number;
+	clicks: number;
+	icon: string | null;
+	shortcut: string | null;
+};
 
 export type CachedPhoto = {
 	url: string;
@@ -39,7 +47,9 @@ const SCHEMA = `
 		label TEXT NOT NULL,
 		url TEXT NOT NULL,
 		position INTEGER NOT NULL,
-		clicks INTEGER NOT NULL DEFAULT 0
+		clicks INTEGER NOT NULL DEFAULT 0,
+		icon TEXT,
+		shortcut TEXT
 	);
 
 	-- One row per fetched background photo, capped/pruned in addPhotoHistory
@@ -107,6 +117,14 @@ function migrateColumns(instance: Database.Database): void {
 	if (!columns.some((col) => col.name === 'quick_links')) {
 		instance.exec('ALTER TABLE newtab_settings ADD COLUMN quick_links TEXT');
 	}
+
+	const quickLinkColumns = instance.prepare('PRAGMA table_info(quick_links)').all() as { name: string }[];
+	if (!quickLinkColumns.some((col) => col.name === 'icon')) {
+		instance.exec('ALTER TABLE quick_links ADD COLUMN icon TEXT');
+	}
+	if (!quickLinkColumns.some((col) => col.name === 'shortcut')) {
+		instance.exec('ALTER TABLE quick_links ADD COLUMN shortcut TEXT');
+	}
 }
 
 let db: Database.Database | null = null;
@@ -152,20 +170,37 @@ export function setNewtabUnsplashQuery(query: string | null): void {
 
 export function getQuickLinks(): QuickLink[] {
 	const rows = getDb()
-		.prepare('SELECT id, label, url, position, clicks FROM quick_links ORDER BY position ASC, id ASC')
+		.prepare('SELECT id, label, url, position, clicks, icon, shortcut FROM quick_links ORDER BY position ASC, id ASC')
 		.all() as QuickLink[];
 	return rows;
 }
 
-export function addQuickLink(label: string, url: string): QuickLink {
+export function addQuickLink(label: string, url: string, icon: string | null = null, shortcut: string | null = null): QuickLink {
 	const db = getDb();
 	const maxPosition = db.prepare('SELECT COALESCE(MAX(position), -1) AS max FROM quick_links').get() as {
 		max: number;
 	};
 	const result = db
-		.prepare('INSERT INTO quick_links (label, url, position, clicks) VALUES (?, ?, ?, 0)')
-		.run(label, url, maxPosition.max + 1);
-	return { id: Number(result.lastInsertRowid), label, url, position: maxPosition.max + 1, clicks: 0 };
+		.prepare('INSERT INTO quick_links (label, url, position, clicks, icon, shortcut) VALUES (?, ?, ?, 0, ?, ?)')
+		.run(label, url, maxPosition.max + 1, icon, shortcut);
+	return {
+		id: Number(result.lastInsertRowid),
+		label,
+		url,
+		position: maxPosition.max + 1,
+		clicks: 0,
+		icon,
+		shortcut
+	};
+}
+
+export function updateQuickLink(
+	id: number,
+	updates: { label: string; url: string; icon: string | null; shortcut: string | null }
+): void {
+	getDb()
+		.prepare('UPDATE quick_links SET label = ?, url = ?, icon = ?, shortcut = ? WHERE id = ?')
+		.run(updates.label, updates.url, updates.icon, updates.shortcut, id);
 }
 
 export function removeQuickLink(id: number): void {
@@ -174,6 +209,26 @@ export function removeQuickLink(id: number): void {
 
 export function incrementQuickLinkClicks(id: number): void {
 	getDb().prepare('UPDATE quick_links SET clicks = clicks + 1 WHERE id = ?').run(id);
+}
+
+// Swaps position with the adjacent link in the given direction — simpler and
+// safer than reassigning every row's position, since it only ever touches
+// the two rows actually changing places.
+export function moveQuickLink(id: number, direction: 'up' | 'down'): void {
+	const db = getDb();
+	const links = getQuickLinks();
+	const index = links.findIndex((l) => l.id === id);
+	if (index === -1) return;
+	const targetIndex = direction === 'up' ? index - 1 : index + 1;
+	if (targetIndex < 0 || targetIndex >= links.length) return;
+
+	const current = links[index];
+	const target = links[targetIndex];
+	const swap = db.transaction(() => {
+		db.prepare('UPDATE quick_links SET position = ? WHERE id = ?').run(target.position, current.id);
+		db.prepare('UPDATE quick_links SET position = ? WHERE id = ?').run(current.position, target.id);
+	});
+	swap();
 }
 
 // --- Photo history -----------------------------------------------------------

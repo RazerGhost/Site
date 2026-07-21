@@ -5,8 +5,10 @@ import {
 	setNewtabUnsplashQuery,
 	getQuickLinks,
 	addQuickLink,
+	updateQuickLink,
 	removeQuickLink,
 	incrementQuickLinkClicks,
+	moveQuickLink,
 	listPhotoHistory,
 	pickRandomPhotoHistory,
 	toggleFavoritePhoto,
@@ -77,9 +79,24 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const label = String(data.get('label') ?? '').trim();
 		let url = String(data.get('url') ?? '').trim();
+		const icon = String(data.get('icon') ?? '').trim() || null;
+		const shortcut = String(data.get('shortcut') ?? '').trim().slice(0, 1).toLowerCase() || null;
 		if (!label || !url) return { success: false };
 		if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-		addQuickLink(label, url);
+		addQuickLink(label, url, icon, shortcut);
+		return { success: true };
+	},
+
+	editQuickLink: async ({ request }) => {
+		const data = await request.formData();
+		const id = Number(data.get('id'));
+		const label = String(data.get('label') ?? '').trim();
+		let url = String(data.get('url') ?? '').trim();
+		const icon = String(data.get('icon') ?? '').trim() || null;
+		const shortcut = String(data.get('shortcut') ?? '').trim().slice(0, 1).toLowerCase() || null;
+		if (!id || !label || !url) return { success: false };
+		if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+		updateQuickLink(id, { label, url, icon, shortcut });
 		return { success: true };
 	},
 
@@ -88,6 +105,15 @@ export const actions: Actions = {
 		const id = Number(data.get('id'));
 		if (!id) return { success: false };
 		removeQuickLink(id);
+		return { success: true };
+	},
+
+	moveQuickLink: async ({ request }) => {
+		const data = await request.formData();
+		const id = Number(data.get('id'));
+		const direction = String(data.get('direction') ?? '') === 'up' ? 'up' : 'down';
+		if (!id) return { success: false };
+		moveQuickLink(id, direction);
 		return { success: true };
 	},
 

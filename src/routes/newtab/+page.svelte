@@ -32,8 +32,11 @@
 		getFullWidthIds,
 		setFullWidthIds,
 		resetFullWidth,
+		getQuickLinksSortByClicks,
 		type FloatPosition
 	} from '$lib/client/newtab-layout';
+	import QuickLinksModal from '$lib/components/QuickLinksModal.svelte';
+	import QuickLinkIcon from '$lib/components/QuickLinkIcon.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -110,7 +113,8 @@
 	}
 
 	// "/" focuses search from anywhere on the page (skipped while already
-	// typing in a field); Escape clears and blurs the search box.
+	// typing in a field); Escape clears and blurs the search box; a bare
+	// single-character key matching a quick link's shortcut navigates there.
 	function handleGlobalKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement;
 		const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
@@ -120,6 +124,13 @@
 		} else if (event.key === 'Escape' && target === searchInputEl) {
 			query = '';
 			searchInputEl?.blur();
+		} else if (!isTyping && !event.ctrlKey && !event.altKey && !event.metaKey) {
+			const link = quickLinkForShortcut(event.key);
+			if (link) {
+				event.preventDefault();
+				trackQuickLinkClick(link.id);
+				window.location.href = link.url;
+			}
 		}
 	}
 
@@ -143,9 +154,11 @@
 	});
 
 	// --- Quick links -----------------------------------------------------
+	// Management UI (add/edit/reorder/icon picker) lives in QuickLinksModal —
+	// this page just owns whether it's open, the display-only sort toggle
+	// (persisted per-device, doesn't touch the server-side `position` the
+	// modal's up/down buttons reorder), and rendering the link pills.
 	let quickLinksOpen = $state(false);
-	let newLinkLabel = $state('');
-	let newLinkUrl = $state('');
 
 	function faviconFor(url: string): string | null {
 		try {
@@ -162,6 +175,20 @@
 		const body = new FormData();
 		body.set('id', String(id));
 		fetch('?/clickQuickLink', { method: 'POST', body }).catch(() => {});
+	}
+
+	let sortByClicks = $state(false);
+	$effect(() => {
+		sortByClicks = getQuickLinksSortByClicks();
+	});
+	const displayedQuickLinks = $derived(
+		sortByClicks ? [...data.quickLinks].sort((a, b) => b.clicks - a.clicks) : data.quickLinks
+	);
+
+	// Single-character keyboard shortcuts (e.g. "g" -> GitHub) — skipped
+	// while typing in a field, same guard as the "/" search-focus shortcut.
+	function quickLinkForShortcut(key: string) {
+		return data.quickLinks.find((l) => l.shortcut && l.shortcut === key.toLowerCase());
 	}
 
 	// --- Weather (client-side, no API key — Open-Meteo) -------------------
@@ -673,73 +700,7 @@
 	</div>
 {/if}
 
-{#if quickLinksOpen}
-	<div class="glass fixed top-16 right-4 z-20 w-80 rounded-2xl p-4">
-		<div class="flex items-center justify-between">
-			<h2 class="text-xs font-medium tracking-wide text-white/50 uppercase">Quick links</h2>
-			<button
-				type="button"
-				onclick={() => (quickLinksOpen = false)}
-				aria-label="Close"
-				class="text-white/50 hover:text-primary"
-			>
-				<X size={14} aria-hidden="true" />
-			</button>
-		</div>
-
-		<ul class="mt-3 grid gap-1.5">
-			{#each data.quickLinks as link (link.id)}
-				<li class="flex items-center justify-between gap-2 text-sm text-white/80">
-					<span class="truncate">{link.label}</span>
-					<form method="POST" action="?/removeQuickLink" use:enhance>
-						<input type="hidden" name="id" value={link.id} />
-						<button
-							type="submit"
-							aria-label="Remove {link.label}"
-							class="shrink-0 text-white/40 hover:text-primary"
-						>
-							<X size={13} aria-hidden="true" />
-						</button>
-					</form>
-				</li>
-			{/each}
-		</ul>
-
-		<form
-			method="POST"
-			action="?/addQuickLink"
-			class="mt-3 grid gap-1.5"
-			use:enhance={() => {
-				return async ({ update }) => {
-					await update();
-					newLinkLabel = '';
-					newLinkUrl = '';
-				};
-			}}
-		>
-			<input
-				name="label"
-				type="text"
-				bind:value={newLinkLabel}
-				placeholder="Label"
-				class="glass w-full rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 outline-none focus:border-primary/60"
-			/>
-			<input
-				name="url"
-				type="text"
-				bind:value={newLinkUrl}
-				placeholder="example.com"
-				class="glass w-full rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 outline-none focus:border-primary/60"
-			/>
-			<button
-				type="submit"
-				class="rounded-lg border border-white/15 py-1.5 text-sm text-white/80 transition-colors hover:border-primary/50 hover:text-primary"
-			>
-				Add
-			</button>
-		</form>
-	</div>
-{/if}
+<QuickLinksModal bind:open={quickLinksOpen} quickLinks={data.quickLinks} bind:sortByClicks />
 
 <main class="relative z-10 mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-6">
 	<div class="text-center">
@@ -796,16 +757,23 @@
 
 	{#if data.quickLinks.length}
 		<div class="mx-auto mt-4 flex flex-wrap justify-center gap-2">
-			{#each data.quickLinks as link (link.id)}
+			{#each displayedQuickLinks as link (link.id)}
 				<a
 					href={link.url}
 					onclick={() => trackQuickLinkClick(link.id)}
 					class="glass glass--interactive flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-primary"
 				>
-					{#if faviconFor(link.url)}
+					{#if link.icon}
+						<QuickLinkIcon icon={link.icon} size={14} />
+					{:else if faviconFor(link.url)}
 						<img src={faviconFor(link.url)} alt="" class="h-3.5 w-3.5 rounded-sm" />
 					{/if}
 					{link.label}
+					{#if link.shortcut}
+						<span class="rounded border border-white/15 px-1 text-[9px] tracking-wide text-white/40 uppercase">
+							{link.shortcut}
+						</span>
+					{/if}
 				</a>
 			{/each}
 		</div>
