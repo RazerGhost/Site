@@ -354,12 +354,16 @@
 	// dragged it becomes position:fixed and remembers its spot per-device via
 	// localStorage (see $lib/client/newtab-layout.ts) — deliberately not
 	// synced server-side, this is layout preference, not data.
+	// Live/frequently-changing widgets lead, so the eye lands on what's
+	// actually fresh right now; the static "right now" status blurb (set
+	// once and left alone for days) sits further down instead of being the
+	// first, full-width thing on the page.
 	const WIDGET_IDS = [
-		'right-now',
 		'now-playing',
 		'discord',
-		'recent-notes',
 		'watching',
+		'right-now',
+		'recent-notes',
 		'weather',
 		'focus',
 		'note'
@@ -379,6 +383,10 @@
 
 	let widgetEls: Partial<Record<WidgetId, HTMLDivElement>> = {};
 	let floatPositions = $state<Partial<Record<WidgetId, FloatPosition>>>({});
+	// Height of the widget currently being dragged, captured at pointerdown —
+	// used to size its grid placeholder (see startDrag/template) so the slot
+	// doesn't collapse the instant the drag starts.
+	let dragPlaceholderHeight = $state<number | null>(null);
 	// Persisted grid order (see $lib/client/newtab-layout.ts) — a widget's
 	// slot within the grid, independent of whether it's currently floating.
 	let widgetOrder = $state<WidgetId[]>([...WIDGET_IDS]);
@@ -448,6 +456,14 @@
 	// document.elementFromPoint would otherwise always hit the dragged
 	// widget itself (it's rendered right under the cursor) — hiding it from
 	// hit-testing for the duration of the lookup reveals whatever's beneath.
+	// Its held-open placeholder (see template) carries the same
+	// data-widget-id and is excluded too — the placeholder exists purely to
+	// keep the grid from compacting mid-drag, not to act as a "drop here to
+	// go home" target. Treating a placeholder hit as a real target made it
+	// too easy to trigger by accident: the placeholder is exactly as big as
+	// the widget's original cell, so any drag that hadn't yet fully cleared
+	// that box — including a short nudge toward the very next slot — would
+	// snap back to "original position" instead of reaching the neighbor.
 	function widgetIdUnderPoint(x: number, y: number, excludeId: WidgetId): WidgetId | null {
 		const excludeEl = widgetEls[excludeId];
 		const prevPointerEvents = excludeEl?.style.pointerEvents;
@@ -468,6 +484,7 @@
 		const origin = existing ?? { x: rect.left, y: rect.top, width: rect.width };
 		floatPositions = { ...floatPositions, [id]: origin };
 		activeDragId = id;
+		dragPlaceholderHeight = rect.height;
 
 		const startX = event.clientX;
 		const startY = event.clientY;
@@ -486,20 +503,29 @@
 			window.removeEventListener('pointerup', onUp);
 			window.removeEventListener('pointercancel', onUp);
 			activeDragId = null;
+			dragPlaceholderHeight = null;
 
 			const targetId = dragOverId;
 			dragOverId = null;
 
 			if (moved && targetId) {
 				// Dropped on another widget — reorder into its slot and dock
-				// back into the grid rather than staying floated.
+				// back into the grid rather than staying floated. Which side of
+				// the target to land on depends on drag direction: moving
+				// forward (e.g. the middle widget dropped onto its right
+				// neighbor) has to insert *after* the target, or removing the
+				// dragged widget first shifts the target back into the exact
+				// slot the drag was trying to leave — "insert before" alone
+				// makes forward drags onto an adjacent widget silently no-op.
+				const wasBefore = widgetOrder.indexOf(id) < widgetOrder.indexOf(targetId);
 				const next = { ...floatPositions };
 				delete next[id];
 				floatPositions = next;
 				clearFloatPosition(id);
 
 				const nextOrder = widgetOrder.filter((w) => w !== id);
-				nextOrder.splice(nextOrder.indexOf(targetId), 0, id);
+				const targetIndex = nextOrder.indexOf(targetId);
+				nextOrder.splice(wasBefore ? targetIndex + 1 : targetIndex, 0, id);
 				widgetOrder = nextOrder;
 				setWidgetOrder(nextOrder);
 			} else if (moved) {
@@ -705,7 +731,7 @@
 <main class="relative z-10 mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-6">
 	<div class="text-center">
 		<p class="text-6xl font-bold tracking-tight text-white tabular-nums">{timeString}</p>
-		<p class="mt-2 text-lg text-white/70">{greeting}.</p>
+		<p class="mt-2 text-lg text-white/80">{greeting}.</p>
 	</div>
 
 	<form class="mx-auto mt-6 w-full max-w-lg" onsubmit={submitSearch}>
@@ -732,7 +758,7 @@
 				<button
 					type="button"
 					onclick={() => runSearch(recent)}
-					class="rounded-full px-2.5 py-1 text-xs text-white/40 transition-colors hover:text-primary"
+					class="rounded-full px-2.5 py-1 text-xs text-white/55 transition-colors hover:text-primary"
 				>
 					{recent}
 				</button>
@@ -756,7 +782,10 @@
 	</nav>
 
 	{#if data.quickLinks.length}
-		<div class="mx-auto mt-4 flex flex-wrap justify-center gap-2">
+		<p class="mx-auto mt-5 text-center text-[10px] font-medium tracking-wide text-white/35 uppercase">
+			Quick links
+		</p>
+		<div class="mx-auto mt-2 flex flex-wrap justify-center gap-2">
 			{#each displayedQuickLinks as link (link.id)}
 				<a
 					href={link.url}
@@ -786,6 +815,24 @@
 				{@const Icon = meta.icon}
 				{#if id !== 'right-now' || data.statusItems.length}
 					{#if id !== 'watching' || data.watching.length}
+						{#if activeDragId === id}
+							<!-- Holds the widget's grid slot open for the duration of the
+							     drag so neighbors don't compact into it — without this,
+							     the moment a widget lifts off there'd be nowhere left to
+							     drop it back into. Purely a layout spacer, not a drop
+							     target itself (see widgetIdUnderPoint above) — it's exactly
+							     as big as the widget's original cell, so treating it as
+							     "drop here to go home" made short nudges toward the very
+							     next slot snap back instead of landing there. -->
+							<div
+								data-widget-id={id}
+								aria-hidden="true"
+								class="rounded-xl border-2 border-dashed border-white/15 {fullWidthIds.has(id)
+									? 'sm:col-span-3'
+									: ''}"
+								style="order:{widgetOrder.indexOf(id)}; height:{dragPlaceholderHeight ?? 0}px;"
+							></div>
+						{/if}
 						<div
 							bind:this={widgetEls[id]}
 							data-widget-id={id}
@@ -795,11 +842,17 @@
 							aria-label="{meta.label} widget"
 						>
 							<div class="flex items-center justify-between gap-2">
-								<h2 class="flex items-center gap-1.5 text-xs font-medium tracking-wide text-white/50 uppercase">
+								<h2 class="flex items-center gap-1.5 text-xs font-medium tracking-wide text-white/60 uppercase">
 									{#if Icon}
 										<Icon size={13} aria-hidden="true" />
 									{/if}
 									{meta.label}
+									{#if id === 'now-playing' || id === 'discord'}
+										<span class="relative flex h-1.5 w-1.5" title="Live" aria-hidden="true">
+											<span class="absolute h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+											<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+										</span>
+									{/if}
 								</h2>
 								<div class="flex items-center gap-1.5">
 									{#if !floatPositions[id]}
@@ -838,7 +891,7 @@
 								{:else if id === 'now-playing'}
 									<ListeningNowCard bare>
 										{#snippet fallback()}
-											<p class="text-sm text-white/50">Nothing playing right now.</p>
+											<p class="text-sm text-white/60">Nothing playing right now.</p>
 										{/snippet}
 									</ListeningNowCard>
 								{:else if id === 'discord'}
@@ -848,14 +901,22 @@
 										<ul class="grid gap-1.5">
 											{#each data.recentNotes as note}
 												<li>
-													<a href="/notes/{note.id}" class="block truncate text-sm text-white/80 hover:text-primary">
-														{note.title}
+													<a
+														href="/notes/{note.id}"
+														class="group flex items-center gap-2 text-sm text-white/80 hover:text-primary"
+													>
+														<span
+															class="grid h-6 w-6 flex-shrink-0 place-items-center rounded bg-white/5 text-white/40 group-hover:text-primary"
+														>
+															<ScrollText size={12} aria-hidden="true" />
+														</span>
+														<span class="truncate">{note.title}</span>
 													</a>
 												</li>
 											{/each}
 										</ul>
 									{:else}
-										<p class="text-sm text-white/50">No notes yet.</p>
+										<p class="text-sm text-white/60">No notes yet.</p>
 									{/if}
 								{:else if id === 'watching'}
 									<ul class="grid gap-2">
@@ -868,7 +929,7 @@
 													<span class="min-w-0">
 														<span class="block truncate text-sm text-white/80 group-hover:text-primary">{item.title}</span>
 														{#if item.nextToWatch}
-															<span class="block text-xs text-white/50">Next: {item.nextToWatch}</span>
+															<span class="block text-xs text-white/60">Next: {item.nextToWatch}</span>
 														{/if}
 													</span>
 												</a>
@@ -877,17 +938,17 @@
 									</ul>
 								{:else if id === 'weather'}
 									{#if weather === null}
-										<p class="text-sm text-white/50">Checking…</p>
+										<p class="text-sm text-white/60">Checking…</p>
 									{:else if weather === 'denied'}
-										<p class="text-sm text-white/50">Location access denied.</p>
+										<p class="text-sm text-white/60">Location access denied.</p>
 									{:else if weather === 'timeout' || weather === 'unavailable' || weather === 'error'}
-										<p class="text-sm text-white/50">
+										<p class="text-sm text-white/60">
 											{weather === 'timeout' ? 'Location lookup timed out.' : 'Weather unavailable.'}
 										</p>
 										<button
 											type="button"
 											onclick={loadWeather}
-											class="mt-1.5 text-xs text-white/50 underline hover:text-primary"
+											class="mt-1.5 text-xs text-white/60 underline hover:text-primary"
 										>
 											Retry
 										</button>
@@ -897,7 +958,7 @@
 									{/if}
 								{:else if id === 'focus'}
 									<p class="text-xl font-semibold text-white tabular-nums">{pomodoroTimeString}</p>
-									<p class="text-xs text-white/50">
+									<p class="text-xs text-white/60">
 										{pomodoroOnBreak ? 'Break' : 'Focus'} · {data.focusStats.sessionsToday} session{data.focusStats
 											.sessionsToday === 1
 											? ''
