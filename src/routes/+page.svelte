@@ -57,6 +57,15 @@
 				<div class="mt-2 flex justify-center sm:justify-start">
 					<DiscordPresence compact />
 				</div>
+				<a
+					href="https://rg-digital.dev/about"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="link mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary hover:bg-primary/15"
+				>
+					Got something to build together? See my work at RG Digital
+					<ArrowRight size={13} aria-hidden="true" />
+				</a>
 			</div>
 
 			<ul class="flex flex-wrap justify-center gap-3 sm:justify-end" data-hero-reveal="2">

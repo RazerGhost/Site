@@ -171,6 +171,7 @@ export const gearGroups: { label: string; icon: GearIcon; items: GearItem[] }[] 
 ];
 
 export const navLinks = [
+  { label: "About", href: "/about" },
   { label: "Projects", href: "/projects" },
   { label: "Devlog", href: "/devlog" },
   { label: "Gear", href: "/gear" },
